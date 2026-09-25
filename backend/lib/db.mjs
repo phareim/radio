@@ -76,6 +76,11 @@ function migrate(db) {
     db.exec('ALTER TABLE landscapes ADD COLUMN owner TEXT');
     db.prepare('UPDATE landscapes SET owner = ? WHERE owner IS NULL').run(legacy);
   }
+  // A composed channel's own painting (backend/paint.mjs), added 2026-09-25.
+  const lc = cols('landscapes');
+  for (const [col, type] of [['paint_status', 'TEXT'], ['paint_error', 'TEXT'], ['painted_at', 'TEXT']]) {
+    if (!lc.includes(col)) db.exec(`ALTER TABLE landscapes ADD COLUMN ${col} ${type}`);
+  }
   if (!cols('feedback').includes('user')) {
     db.exec('ALTER TABLE feedback ADD COLUMN user TEXT');
     db.prepare('UPDATE feedback SET user = ? WHERE user IS NULL').run(legacy);

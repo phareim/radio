@@ -13,7 +13,7 @@ Opus does; Opus can also compose new landscapes.
 | Audio (Web Audio player, voices, drums, ambience, fx) | `engine/audio/` | `docs/engine.md` (player) |
 | Pixel scenes, one per landscape | `scene/` | `docs/landscapes.md` |
 | Web app (Nuxt 3 Worker, Reader login, proxies to the backend) | repo root | `README.md` |
-| Backend `radio-api` on Sleeper (feedback, compose, review) | `backend/` | `backend/README.md` |
+| Backend `radio-api` on Sleeper (feedback, compose, review, painting scenes for composed channels) | `backend/` | `backend/README.md` |
 
 ## Rules
 

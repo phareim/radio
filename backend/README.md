@@ -19,6 +19,7 @@ lib/jobs.mjs      job queue: one Opus call at a time
 lib/opus.mjs      spawns slp -p - --model opus (cwd = OS temp dir, 6 min timeout)
 lib/engine.mjs    loads the engine modules and the schema text for prompts
 compose.mjs       compose prompt, JSON parse, validate, one repair round, store
+paint.mjs         paints a composed channel its own scene with a Claude Code agent; also a CLI
 review.mjs        review prompt and report writer; also a CLI
 test/             node:test suites, stub engine and fake slp in fixtures/
 ```
@@ -60,6 +61,35 @@ built-in id. On errors it sends one repair round with the error list; if that
 still fails the job errors with the validator's messages. A compose takes one
 to three minutes.
 
+## Paint
+
+After a compose, radio-api starts `backend/paint.mjs <id>` detached (through
+`flock` on `$TMPDIR/radio-paint.lock`, so one painting at a time; log in
+`backend/data/paint/<id>.log`). Until it finishes, the channel shows the
+scene Opus borrowed. The painter:
+
+1. makes a throwaway git worktree of `origin/main` in `$TMPDIR/radio-paint/<id>`;
+2. runs `claude --permission-mode auto --effort high --model opus -p …` there.
+   The agent writes `scene/scenes/<id>.ts`, registers it (`scene/index.ts`,
+   `SCENE_IDS` in `engine/catalog.ts`, the shots list, `docs/landscapes.md`),
+   screenshots it under the Chromium flock and iterates;
+3. fails the job if the diff touches any other file or the scene is not
+   registered, then runs the engine tests and bundles the scene harness;
+4. commits, rebases and pushes to `main`, waits for the deploy workflow with
+   `gh run list`, and only then sets the landscape's `scene` to its own id.
+
+Only compositions by `RADIO_PAINT_OWNERS` are painted automatically: the
+agent runs with Petter's tools and pushes to a public repo, and the scene
+file names the channel. By hand, for any landscape:
+
+```bash
+node --no-warnings backend/paint.mjs <landscape id>
+```
+
+State is on the landscape row: `paint_status` (`queued`, `painting`,
+`deploying`, `done`, `error`), `paint_error`, `painted_at`. A painting takes
+the agent's time plus one deploy; it runs on the Claude Max subscription.
+
 ## Review
 
 `POST /review`, or from a shell in the repo root:
@@ -94,6 +124,11 @@ semantics:
 | `RADIO_SLP_BIN` | default `slp`; tests point it at `test/fixtures/fake-slp.mjs` |
 | `RADIO_ENGINE_DIR` | default `engine/`; tests point it at a stub |
 | `RADIO_REVIEWS_DIR` | default `reviews/` |
+| `RADIO_PAINT` | `off` turns automatic painting off |
+| `RADIO_PAINT_OWNERS` | comma list of listeners whose compositions get painted; default `RADIO_LEGACY_OWNER` |
+| `RADIO_PAINT_CLAUDE_BIN` | default `claude` |
+| `RADIO_PAINT_TIMEOUT_MS` | agent timeout, default 45 min |
+| `RADIO_PAINT_DIR` | where worktrees go, default `$TMPDIR/radio-paint` |
 
 ## Data
 

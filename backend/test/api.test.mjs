@@ -24,10 +24,13 @@ const { openDb } = await import('../lib/db.mjs');
 const { createApp } = await import('../lib/app.mjs');
 
 let db, server, jobs, base;
+/** Paintings the app asked for after a compose (the real one spawns an agent). */
+const painted = [];
 
 before(async () => {
   db = openDb(join(TMP, 'radio.db'));
-  ({ server, jobs } = createApp({ db, apiKey: KEY, corsOrigins: ['https://radio.phareim.no'] }));
+  const paint = (_db, landscape, owner) => { painted.push({ id: landscape.id, owner }); return true; };
+  ({ server, jobs } = createApp({ db, apiKey: KEY, corsOrigins: ['https://radio.phareim.no'], paint }));
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   base = `http://127.0.0.1:${server.address().port}`;
 });
@@ -232,3 +235,18 @@ test('settings: per listener, cleaned, required listener', async () => {
   assert.equal((await api('GET', '/settings', null, { user: 'other@example.com' })).body.settings, null)
   assert.equal((await api('POST', '/compose', { prompt: 'x' }, { user: null })).status, 401)
 })
+
+test('compose: a finished landscape is handed to the painter with its owner', async () => {
+  const before = painted.length;
+  const res = await fetch(`${base}/compose`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${KEY}`, 'content-type': 'application/json', 'x-radio-user': 'painter@example.com' },
+    body: JSON.stringify({ prompt: 'a quiet harbour' }),
+  });
+  assert.equal(res.status, 202);
+  await jobs.idle();
+  assert.equal(painted.length, before + 1);
+  assert.equal(painted.at(-1).owner, 'painter@example.com');
+  const cols = db.prepare('PRAGMA table_info(landscapes)').all().map((c) => c.name);
+  for (const c of ['paint_status', 'paint_error', 'painted_at']) assert.ok(cols.includes(c), c);
+});

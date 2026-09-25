@@ -6,6 +6,7 @@ import { now, feedbackRow } from './db.mjs';
 import { createJobs } from './jobs.mjs';
 import { loadEngine } from './engine.mjs';
 import { composeLandscape } from '../compose.mjs';
+import { startPaint } from '../paint.mjs';
 import { runReview } from '../review.mjs';
 
 const MAX_BODY = 256 * 1024;
@@ -85,9 +86,12 @@ function cleanSettings(b) {
   return { hidden: [...new Set(hidden)].slice(0, 200) };
 }
 
-export function createApp({ db, apiKey, corsOrigins = [], ask }) {
+export function createApp({ db, apiKey, corsOrigins = [], ask, paint = startPaint }) {
   const jobs = createJobs(db, {
-    compose: (input) => composeLandscape({ db, prompt: input.prompt, base: input.base, owner: input.owner ?? null, ask }),
+    compose: async (input) => {
+      const res = await composeLandscape({ db, prompt: input.prompt, base: input.base, owner: input.owner ?? null, ask });
+      return { ...res, painting: paint(db, res.landscape, input.owner ?? null) };
+    },
     review: () => runReview({ db, ask }),
   });
 
