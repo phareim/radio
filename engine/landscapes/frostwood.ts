@@ -27,6 +27,11 @@ export const frostwood: Landscape = {
   lead: {
     voice: 'lead.hollow', range: [59, 79], density: 0.3, stepwise: 0.8,
     rhythm: ['long', 'dotted'], motifBars: 2, rest: 0.4,
+    motifs: [
+      '5 - - - - - 4 - | 3 - - - 2 - - -',
+      '1 - - 2 3 - - - | 5 - - - 4 - 3 -',
+      '3 - 2 - 1 - - - | 7, - - - 1 - - .',
+    ],
   },
   counter: { voice: 'counter.strings', style: 'guide' },
   bells: { voice: 'bell.glass', density: 0.3 },

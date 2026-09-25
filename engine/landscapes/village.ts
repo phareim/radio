@@ -27,6 +27,11 @@ export const village: Landscape = {
   lead: {
     voice: 'lead.ep', range: [60, 81], density: 0.5, stepwise: 0.75,
     rhythm: ['straight', 'syncopated', 'dotted'], motifBars: 2, rest: 0.3,
+    motifs: [
+      '3 - 5 - 6 5 3 - | 2 - 1 - . . . .',
+      ". 5 6 1' - 7 6 5 | 6 - - - 3 - - -",
+      '1 2 3 5 - 3 2 1 | 2 - - - . . . .',
+    ],
   },
   counter: { voice: 'counter.soft', style: 'answer' },
   bells: { voice: 'bell.chime', density: 0.15 },

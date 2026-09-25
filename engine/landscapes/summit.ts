@@ -27,6 +27,11 @@ export const summit: Landscape = {
   lead: {
     voice: 'lead.hollow', range: [62, 84], density: 0.35, stepwise: 0.6,
     rhythm: ['long', 'dotted'], motifBars: 2, rest: 0.35, pentatonic: true,
+    motifs: [
+      '3 - 4 - 5 - - - | 2 - - - - - . .',
+      '5 - - - 6 - 7 - | 5 - - - - - - .',
+      '1 - 2 - 3 - - - | 5 - - - 3 - - -',
+    ],
   },
   counter: { voice: 'counter.strings', style: 'guide' },
   bells: { voice: 'bell.glass', density: 0.25 },

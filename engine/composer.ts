@@ -51,6 +51,10 @@ export interface Motif {
   cells: Cell[]
   /** Scale-step movement into each note after the first (first entry is 0). */
   contour: number[]
+  /** Written themes: the scale degree (0-based) the theme starts on. */
+  start?: number
+  /** Written themes keep their passing notes; only real clashes are corrected. */
+  written?: boolean
 }
 
 function noteCount(cells: Cell[]): number {
@@ -95,7 +99,51 @@ function makeContour(n: number, rng: Rng, stepwise: number): number[] {
   return out
 }
 
-export function makeMotif(L: Landscape, rng: Rng, density: number): Motif {
+const DEGREE = /^([1-7])('*|,*)$/
+
+/**
+ * A written theme ('1 - 5, 1 2 3 - 5 | 4 - 3 - 2 - . .') as a Motif:
+ * rhythm from the token positions, contour from the degree steps.
+ * Null when it does not parse.
+ */
+export function parseMotif(src: string): Motif | null {
+  const bars = src.split('|').map(b => b.trim().split(/\s+/))
+  if (!bars.length || bars.length > 2 || bars.some(b => b.length !== 8 && b.length !== 16)) return null
+  const cells: Cell[] = []
+  const degrees: number[] = []
+  let open: [number, number] | null = null
+  for (const toks of bars) {
+    const cell: Cell = []
+    const stride = 16 / toks.length
+    toks.forEach((tok, i) => {
+      if (tok === '-') { if (open) open[1] += stride; return }
+      if (tok === '.') { open = null; return }
+      const m = DEGREE.exec(tok)
+      if (!m) throw new Error(tok)
+      const oct = m[2]!.startsWith("'") ? m[2]!.length : -m[2]!.length
+      degrees.push(Number(m[1]) - 1 + oct * 7)
+      open = [i * stride, stride]
+      cell.push(open)
+    })
+    cells.push(cell)
+  }
+  if (!degrees.length) return null
+  const contour = degrees.map((d, i) => (i === 0 ? 0 : d - degrees[i - 1]!))
+  return { cells, contour, start: ((degrees[0]! % 7) + 7) % 7, written: true }
+}
+
+function safeParseMotif(src: string): Motif | null {
+  try { return parseMotif(src) } catch { return null }
+}
+
+/** A theme for the landscape: mostly one of its written motifs, else invented. */
+export function makeMotif(L: Landscape, rng: Rng, density: number, written = 0.8): Motif {
+  const themes = (L.lead?.motifs ?? []).map(safeParseMotif).filter((m): m is Motif => m !== null)
+  if (themes.length && rng.chance(written)) return rng.pick(themes)
+  return inventMotif(L, rng, density)
+}
+
+function inventMotif(L: Landscape, rng: Rng, density: number): Motif {
   const bars = L.lead?.motifBars ?? 2
   const cells: Cell[] = []
   for (let b = 0; b < bars; b++) cells.push(pickCell(L, rng, density))
@@ -107,7 +155,8 @@ export function makeMotif(L: Landscape, rng: Rng, density: number): Motif {
 /** A related motif: same rhythm with a new contour, or inverted, or a new second bar. */
 export function varyMotif(m: Motif, L: Landscape, rng: Rng, density: number): Motif {
   const kind = rng.weighted(['invert', 'contour', 'rhythm'], [2, 2, 1])
-  if (kind === 'invert') return { cells: m.cells, contour: m.contour.map(v => -v) }
+  // Inverting keeps a written theme recognisable; a new contour does not.
+  if (kind === 'invert') return { cells: m.cells, contour: m.contour.map(v => -v), written: m.written }
   if (kind === 'contour') return { cells: m.cells, contour: makeContour(m.contour.length, rng, L.lead?.stepwise ?? 0.7) }
   const cells = [...m.cells]
   cells[cells.length - 1] = pickCell(L, rng, density)
@@ -336,6 +385,14 @@ function lead(ctx: BarContext, out: NoteEvent[]): void {
     const ref = ctx.mem.lead ?? centre + (ctx.phraseBar >= ctx.phraseBars / 2 ? 2 : -2)
     const tones = chordTonesIn(c, spec.range[0] + 2, spec.range[1] - 4)
     ctx.mem.anchor = tones.length ? nearest(tones, ref) : nearest(pitches, ref)
+    if (plan.motif.start !== undefined && !plan.cadence) {
+      // A written theme starts on its own degree when that degree belongs to the chord.
+      const pc = ctx.scale[plan.motif.start]!
+      if (chordPcs(c).includes(pc)) {
+        const own = scaleTonesIn([pc], spec.range[0] + 2, spec.range[1] - 4)
+        if (own.length) ctx.mem.anchor = nearest(own, ref)
+      }
+    }
     ctx.mem.cursor = 0
   }
   // Cursor into the motif's contour for this bar.
@@ -363,7 +420,12 @@ function lead(ctx: BarContext, out: NoteEvent[]): void {
       if (idx >= pitches.length) idx = Math.max(0, 2 * (pitches.length - 1) - idx)
       midi = pitches[idx]!
       const strong = step % 4 === 0 || len >= 4
-      if (strong) {
+      if (plan.motif.written) {
+        if (isAvoid(midi % 12, c)) {
+          const tones = chordTonesIn(c, spec.range[0], spec.range[1])
+          if (tones.length) midi = nearest(tones, midi)
+        }
+      } else if (strong) {
         // Strong beats and long notes sit on chord tones.
         const tones = chordTonesIn(c, spec.range[0], spec.range[1])
         if (tones.length && !tones.includes(midi)) {

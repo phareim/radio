@@ -27,6 +27,10 @@ export const deepspace: Landscape = {
   lead: {
     voice: 'lead.hollow', range: [62, 82], density: 0.2, stepwise: 0.7,
     rhythm: ['long'], motifBars: 2, rest: 0.5, pentatonic: true,
+    motifs: [
+      '5 - - - - - - - | 3 - - - - - - -',
+      "1' - - - - - - - | 7 - - - 5 - - -",
+    ],
   },
   bells: { voice: 'bell.glass', density: 0.3 },
   drums: {

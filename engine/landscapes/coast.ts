@@ -27,6 +27,11 @@ export const coast: Landscape = {
   lead: {
     voice: 'lead.square', range: [62, 86], density: 0.55, stepwise: 0.7,
     rhythm: ['straight', 'dotted', 'syncopated'], motifBars: 2, rest: 0.25,
+    motifs: [
+      '1 - 5, 1 2 3 - 5 | 4 - 3 - 2 - . .',
+      '5 - - 3 4 5 6 5 | 3 - - - . . 2 3',
+      "1' - 7 5 6 - 5 - | 3 - 5 - 2 - - .",
+    ],
   },
   counter: { voice: 'counter.soft', style: 'guide' },
   drums: {

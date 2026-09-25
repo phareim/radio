@@ -26,6 +26,11 @@ export const jungle: Landscape = {
   lead: {
     voice: 'lead.whistle', range: [67, 88], density: 0.45, stepwise: 0.65,
     rhythm: ['syncopated', 'straight', 'dotted'], motifBars: 2, rest: 0.3, pentatonic: true,
+    motifs: [
+      "5 . 5 6 . 1' 6 5 | 3 - . 5 - . . .",
+      "1' 7 5 . 6 5 3 . | 5 - - - . . . .",
+      '. 3 5 . 6 - 5 3 | 1 - 3 - 2 - . .',
+    ],
   },
   counter: { voice: 'mallet.kalimba', style: 'answer' },
   drums: {

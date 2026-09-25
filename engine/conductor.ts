@@ -128,7 +128,8 @@ export function createConductor(opts: ConductorOptions): Conductor {
   let schedule: Scheduled[] = []
   let move: LandscapeMove | null = null
   let building: { from: string; to: string; startBar: number; total: number } | null = null
-  let breathUntil = -1
+  /** A phrase where drums and lead step out: [start, until). */
+  let breath: { start: number; until: number } | null = null
   let nextBreath = 3 + master.int(3)
   let sectionCount = 0
   let theme: Motif
@@ -153,10 +154,11 @@ export function createConductor(opts: ConductorOptions): Conductor {
     return rng.weighted(pool, pool.map(p => p.weight ?? 1))
   }
 
-  function freshTheme(): void {
+  /** A landscape opens with one of its written themes; later home themes may be invented. */
+  function freshTheme(first = false): void {
     const rng = master.fork(hashSeed(sectionCount, 77))
     homeProg = pickProgression('a', rng)
-    theme = makeMotif(L, rng, density)
+    theme = makeMotif(L, rng, density, first ? 1 : 0.8)
   }
 
   function newSection(name: Section['name'], startBar: number): Section {
@@ -172,7 +174,8 @@ export function createConductor(opts: ConductorOptions): Conductor {
       prog = rng.chance(0.15) && L.progressions.some(p => p.role === 'bridge')
         ? L.progressions.find(p => p.role === 'bridge')!
         : pickProgression('b', rng, homeProg)
-      motif = makeMotif(L, rng, density)
+      // The contrast section mostly invents; now and then it borrows another written theme.
+      motif = makeMotif(L, rng, density, 0.35)
     }
     const motifB = varyMotif(motif, L, rng.fork(3), density)
     const phrases = phraseBars === 4 ? 4 : 2
@@ -210,10 +213,10 @@ export function createConductor(opts: ConductorOptions): Conductor {
 
   // ---- layers --------------------------------------------------------------
 
-  function desired(): Set<Layer> {
+  function desired(at: number): Set<Layer> {
     const I = controls.intensity
     let want = new Set<Layer>(L.layers[I])
-    if (breathUntil > bar) {
+    if (breath && at >= breath.start && at < breath.until) {
       // Breathing: drums, perc, lead and counter step out; the rest stays.
       const low = new Set<Layer>(L.layers[Math.max(0, I - 2)])
       for (const l of ['pad', 'drone', 'arp', 'bells', 'bass'] as Layer[]) if (want.has(l)) low.add(l)
@@ -237,7 +240,12 @@ export function createConductor(opts: ConductorOptions): Conductor {
   /** Plan entries and exits so `present` moves toward `desired()`. */
   function reconcile(): void {
     if (move) return
-    const want = desired()
+    // Additions follow what is wanted now; removals what is wanted when the phrase turns.
+    const edge = phraseBoundary(bar)
+    const wantEdge = desired(edge)
+    const wantNow = desired(bar)
+    const want = new Set([...wantNow].filter(l => wantEdge.has(l) || edge === bar))
+    for (const l of present) if (!wantEdge.has(l)) want.delete(l)
     schedule = schedule.filter(e => e.bar >= bar)
     const willHave = (l: Layer): boolean => {
       const last = [...schedule].reverse().find(e => e.layer === l)
@@ -249,7 +257,7 @@ export function createConductor(opts: ConductorOptions): Conductor {
       // Cancel a pending move for this layer first; it may be all that was needed.
       schedule = schedule.filter(e => e.layer !== l)
       if (want.has(l) === present.has(l)) continue
-      if (!want.has(l)) schedule.push({ bar: phraseBoundary(bar), layer: l, on: false })
+      if (!want.has(l)) schedule.push({ bar: edge, layer: l, on: false })
     }
     const adds = ENTRY_ORDER.filter(l => want.has(l) && !willHave(l))
     if (!adds.length) return
@@ -302,7 +310,7 @@ export function createConductor(opts: ConductorOptions): Conductor {
     planBridge(m)
     move = m
     building = null
-    breathUntil = -1
+    breath = null
     // The old place thins out: rhythm and melody finish the phrase, the arp and bells two bars later.
     schedule = schedule.filter(e => !e.on && e.bar >= bar)
     for (const l of ['drums', 'perc', 'lead', 'counter'] as Layer[]) {
@@ -330,7 +338,7 @@ export function createConductor(opts: ConductorOptions): Conductor {
     if (L.layers[Math.min(1, controls.intensity)].includes('bass') && present.has('bass')) keep.add('bass')
     present = new Set([...present].filter(l => keep.has(l)))
     if (!present.has('pad')) present.add('pad')
-    freshTheme()
+    freshTheme(true)
     section = newSection('A', bar)
     bpmGlide = null
     nextBreath = sectionCount + 3 + master.int(3)
@@ -363,7 +371,7 @@ export function createConductor(opts: ConductorOptions): Conductor {
       }
       if (move) controls.landscape = move.to.id
     }
-    if (c.intensity !== undefined && c.intensity !== prevIntensity) breathUntil = -1
+    if (c.intensity !== undefined && c.intensity !== prevIntensity) breath = null
     if (!move) reconcile()
   }
 
@@ -417,7 +425,7 @@ export function createConductor(opts: ConductorOptions): Conductor {
     const phraseStartsHere = b === phraseStart + phraseBars || (b === phraseStart && b === 0)
     if (b === phraseStart + phraseBars) phraseStart = b
     let sectionStart = b === 0
-    if (b === 0) { freshTheme(); section = newSection('A', 0) }
+    if (b === 0) { freshTheme(true); section = newSection('A', 0) }
     if (phraseStartsHere && b > 0 && !(move && b >= move.bridgeStart)) {
       if (!building || b !== building.startBar) {
         section.phrasesDone++
@@ -438,15 +446,15 @@ export function createConductor(opts: ConductorOptions): Conductor {
       // Breath: decided a phrase ahead so the drums can close with a fill.
       const lastPhrase = section.phrasesDone === section.phrases - 1
       const settled = !building && !schedule.some(e => e.on)
-      if (lastPhrase && settled && !controls.hold && !move && controls.intensity >= 2 && sectionCount >= nextBreath && breathUntil < b) {
-        breathUntil = b + 2 * phraseBars
+      if (lastPhrase && settled && !breath && !controls.hold && !move && controls.intensity >= 2 && sectionCount >= nextBreath) {
+        breath = { start: b + phraseBars, until: b + 2 * phraseBars }
         nextBreath = sectionCount + 3 + master.int(3)
       }
       // Tempo glides across the phrase toward the target.
       const target = L.bpm + controls.tempo
       bpmGlide = Math.abs(target - bpmEnd) > 0.01 ? { from: bpmEnd, to: target, start: b, bars: phraseBars } : null
     }
-    if (breathUntil === b) breathUntil = -1
+    if (breath && b >= breath.until) breath = null
     if (!move) reconcile()
 
     // Apply the schedule.
@@ -563,7 +571,7 @@ export function createConductor(opts: ConductorOptions): Conductor {
         progress: 0.7 + 0.3 * (1 - upcoming.length / Math.max(1, building.total)),
         note: next ? `arriving · ${next.layer} in ${next.inBars}` : 'arriving',
       }
-    } else if (breathUntil > b) {
+    } else if (breath && b >= breath.start) {
       transition = { kind: 'intensity', from: L.id, to: L.id, progress: 0.5, note: 'breathing' }
     } else if (upcoming.length || schedule.some(e => !e.on)) {
       const next = upcoming[0]

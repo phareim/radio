@@ -204,6 +204,17 @@ export interface MelodySpec {
   rest: number
   /** Pentatonic filter: melody uses only the mode's pentatonic subset. */
   pentatonic?: boolean
+  /**
+   * Written themes. Each is one or two bars of eighth notes separated by
+   * '|', eight tokens a bar: a scale degree 1–7 (' after it = an octave up,
+   * , = an octave down), '-' holds, '.' rests. Example:
+   * "1 - 5, 1 2 3 - 5 | 4 - 3 - 2 - . ."
+   * The composer keeps the rhythm and the melodic shape and fits the notes
+   * to whatever chord is under them, so a theme survives mode and chord
+   * changes. Sections mostly state and vary these; without them the
+   * composer invents motifs.
+   */
+  motifs?: string[]
 }
 
 export type ArpPattern = 'up' | 'down' | 'updown' | 'random' | 'broken' | 'pedal' | 'sequence'

@@ -30,6 +30,11 @@ export const voyager: Landscape = {
   lead: {
     voice: 'lead.fm', range: [67, 88], density: 0.4, stepwise: 0.6,
     rhythm: ['long', 'straight'], motifBars: 2, rest: 0.4,
+    motifs: [
+      "1 - 5 - 2' - - - | 7 - 5 - 3 - - -",
+      "3 - 4 - 5 - 7 - | 1' - - - - - - -",
+      '5 - 4 - 3 - 2 - | 3 - - - - - . .',
+    ],
   },
   counter: { voice: 'counter.soft', style: 'guide' },
   bells: { voice: 'bell.fm', density: 0.2 },

@@ -26,6 +26,11 @@ export const neonrain: Landscape = {
   lead: {
     voice: 'lead.ep', range: [62, 81], density: 0.4, stepwise: 0.75,
     rhythm: ['syncopated', 'dotted', 'long'], motifBars: 2, rest: 0.35,
+    motifs: [
+      '. 3 5 7 - 5 3 . | 4 - - 3 - . . .',
+      '5 - 4 3 - 1 . . | 2 - 3 - - - . .',
+      '1 - 3 - 5 - 7 6 | 5 - - - . . . .',
+    ],
   },
   counter: { voice: 'counter.soft', style: 'answer' },
   drums: {

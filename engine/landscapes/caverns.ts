@@ -27,6 +27,11 @@ export const caverns: Landscape = {
   lead: {
     voice: 'lead.pulse', range: [62, 84], density: 0.45, stepwise: 0.7,
     rhythm: ['straight', 'dotted'], motifBars: 2, rest: 0.3,
+    motifs: [
+      '1 - 2 3 - 2 1 7, | 1 - - - 5, - - -',
+      '5 - 6 5 - 3 - 2 | 3 - 2 - 1 - - -',
+      '3 - 4 5 - 4 3 2 | 7, - - - . . . .',
+    ],
   },
   counter: { voice: 'counter.soft', style: 'guide' },
   bells: { voice: 'bell.glass', density: 0.2 },

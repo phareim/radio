@@ -6,6 +6,7 @@
 import type { Groove, Landscape, Layer } from './types.ts'
 import { AMBIENCE_IDS, DRUM_HITS, KIT_IDS, LAYER_IDS, MODE_IDS, SCENE_IDS, VOICE_IDS } from './catalog.ts'
 import { parseProgression } from './theory.ts'
+import { parseMotif } from './composer.ts'
 
 export interface Validation {
   ok: boolean
@@ -90,6 +91,14 @@ export function validateLandscape(input: unknown): Validation {
       if (!Array.isArray(m.rhythm) || !m.rhythm.length || m.rhythm.some(r => !['long', 'straight', 'dotted', 'syncopated', 'sixteenths'].includes(r))) err('lead.rhythm')
       if (m.motifBars !== 1 && m.motifBars !== 2) err('lead.motifBars: 1|2')
       if (!num(m.rest) || m.rest < 0 || m.rest > 1) err('lead.rest: 0..1')
+      if (m.motifs !== undefined) {
+        if (!Array.isArray(m.motifs)) err('lead.motifs: list of strings')
+        else m.motifs.forEach((src, i) => {
+          let ok = false
+          try { ok = typeof src === 'string' && parseMotif(src) !== null } catch { ok = false }
+          if (!ok) err(`lead.motifs[${i}]: one or two bars of 8 tokens (degree 1-7 with ' or , for octaves, - hold, . rest), bars split by |`)
+        })
+      }
     }
   }
   if (L.counter !== undefined) {

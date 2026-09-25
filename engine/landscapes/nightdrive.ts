@@ -27,6 +27,11 @@ export const nightdrive: Landscape = {
   lead: {
     voice: 'lead.glide', range: [64, 88], density: 0.5, stepwise: 0.7,
     rhythm: ['long', 'dotted', 'straight'], motifBars: 2, rest: 0.3,
+    motifs: [
+      '5 - - - 3 - 4 - | 5 - 6 - 5 - 3 -',
+      "1' - - 7 - 5 - - | 6 - - - - - . .",
+      "3 - 4 5 - - 7 - | 1' - - - 7 - 5 -",
+    ],
   },
   counter: { voice: 'counter.strings', style: 'guide' },
   drums: {
