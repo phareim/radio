@@ -4,7 +4,9 @@ Generative background music you can steer, in Neon Shrine's pixel look. The
 music is composed and synthesised in the browser (`engine/`, `engine/audio/`),
 the painted place is `scene/`, and `backend/` (radio-api on Sleeper) keeps
 feedback and asks Opus for new places. This file covers the web app at the
-repo root; see `AGENTS.md` for the map.
+repo root; see `AGENTS.md` for the map. A walk-through of how the engine
+works, with editable code cells running it in the page (Norwegian):
+[phareim.md/sleeper/radio-motoren](https://phareim.md/sleeper/radio-motoren/).
 
 ## The web app
 
