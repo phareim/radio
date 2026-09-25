@@ -125,6 +125,24 @@ function sh(cmd, args, opts = {}) {
   return execFileSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...opts }).trim();
 }
 
+/** Paths changed or added in a worktree (NUL-separated porcelain, so nothing is trimmed away). */
+export function changedFiles(dir) {
+  const out = execFileSync('git', ['-C', dir, 'status', '--porcelain', '-z', '--untracked-files=all'], { encoding: 'utf8' });
+  return parsePorcelainZ(out);
+}
+
+export function parsePorcelainZ(out) {
+  const files = [];
+  const parts = out.split('\0');
+  for (let i = 0; i < parts.length; i++) {
+    const e = parts[i];
+    if (!e) continue;
+    files.push(e.slice(3));
+    if (e[0] === 'R' || e[0] === 'C') i++; // the rename's source follows
+  }
+  return files;
+}
+
 function runAgent(prompt, cwd) {
   const bin = process.env.RADIO_PAINT_CLAUDE_BIN || 'claude';
   const timeoutMs = Number(process.env.RADIO_PAINT_TIMEOUT_MS ?? 45 * 60_000);
@@ -185,11 +203,13 @@ export async function paint(db, id) {
     if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
     try { sh('git', ['-C', ROOT, 'worktree', 'prune']); } catch {}
   };
+  let ok = false;
   try {
-    cleanup();
-    sh('git', ['-C', ROOT, 'fetch', '-q', 'origin', 'main']);
-    sh('git', ['-C', ROOT, 'worktree', 'add', '-q', '--detach', dir, 'origin/main']);
+    // A worktree left by a failed run keeps the agent's work: reuse it.
     if (!existsSync(join(dir, 'scene', 'scenes', `${id}.ts`))) {
+      cleanup();
+      sh('git', ['-C', ROOT, 'fetch', '-q', 'origin', 'main']);
+      sh('git', ['-C', ROOT, 'worktree', 'add', '-q', '--detach', dir, 'origin/main']);
       console.log(`[paint] ${id}: agent starting in ${dir}`);
       const summary = await runAgent(buildPaintPrompt(landscape, id), dir);
       console.log(`[paint] ${id}: agent done\n${summary.slice(-1500)}`);
@@ -197,7 +217,7 @@ export async function paint(db, id) {
 
     // The diff must stay inside the scene files, and the scene must be registered.
     const allowed = allowedPaths(id);
-    const changed = sh('git', ['-C', dir, 'status', '--porcelain', '--untracked-files=all']).split('\n').filter(Boolean).map((l) => l.slice(3));
+    const changed = changedFiles(dir);
     const stray = changed.filter((p) => !allowed.has(p));
     if (stray.length) throw new Error(`the painter touched files outside the scene: ${stray.join(', ')}`);
     if (!changed.includes(`scene/scenes/${id}.ts`)) throw new Error(`no scene/scenes/${id}.ts was written`);
@@ -227,12 +247,14 @@ export async function paint(db, id) {
     db.prepare(`UPDATE landscapes SET json = ?, paint_status = 'done', paint_error = NULL, painted_at = ? WHERE id = ?`)
       .run(JSON.stringify(fresh), now(), id);
     console.log(`[paint] ${id}: live`);
+    ok = true;
     return { id, sha };
   } catch (e) {
     set.run('error', String(e.message ?? e).slice(0, 2000), id);
     throw e;
   } finally {
-    cleanup();
+    // On failure the worktree stays for a look and for the next run.
+    if (ok) cleanup();
   }
 }
 

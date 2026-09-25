@@ -86,6 +86,10 @@ file names the channel. By hand, for any landscape:
 node --no-warnings backend/paint.mjs <landscape id>
 ```
 
+A failed run leaves its worktree; the next run on the same id reuses the
+scene already written there and skips the agent. Delete
+`$TMPDIR/radio-paint/<id>` (and `git worktree prune`) to paint from scratch.
+
 State is on the landscape row: `paint_status` (`queued`, `painting`,
 `deploying`, `done`, `error`), `paint_error`, `painted_at`. A painting takes
 the agent's time plus one deploy; it runs on the Claude Max subscription.
