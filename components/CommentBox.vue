@@ -66,9 +66,9 @@ function close(): void {
   --px-edge: var(--pink);
   position: absolute;
   z-index: 20;
-  right: 16px;
-  top: calc(72px + env(safe-area-inset-top, 0px));
-  width: min(420px, calc(100vw - 32px));
+  right: calc(16px + var(--safe-r));
+  top: calc(72px + var(--safe-t));
+  width: min(420px, calc(100vw - 32px - var(--safe-l) - var(--safe-r)));
   padding: 14px 14px 12px;
   background: var(--bg);
   font-size: 16px;
@@ -78,7 +78,7 @@ function close(): void {
 
 /* Phones: at the top, clear of the on-screen keyboard. */
 @media (max-width: 700px) {
-  .cb { top: calc(12px + env(safe-area-inset-top, 0px)); left: 16px; right: 16px; width: auto; }
+  .cb { top: calc(12px + var(--safe-t)); left: calc(16px + var(--safe-l)); right: calc(16px + var(--safe-r)); width: auto; }
 }
 .cb p { margin: 0; }
 

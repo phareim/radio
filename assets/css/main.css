@@ -16,6 +16,10 @@
   --app-height: 100dvh;
   /* Nothing interactive sits lower than this above the bottom edge. */
   --app-safe-bottom: env(safe-area-inset-bottom, 0px);
+  /* The notch and rounded corners: the scene runs under them, controls stay inside. */
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
   color-scheme: dark;
 }
 

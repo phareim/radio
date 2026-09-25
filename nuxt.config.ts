@@ -53,5 +53,9 @@ export default defineNuxtConfig({
     tsConfig: { compilerOptions: { allowImportingTsExtensions: true, noEmit: true } },
   },
 
+  // Look for a new deploy every five minutes (plugins/sw.client.ts reloads
+  // into it when the music is not playing).
+  experimental: { checkOutdatedBuildInterval: 5 * 60_000 },
+
   devServer: { port: 3040 },
 })

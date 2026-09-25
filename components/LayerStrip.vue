@@ -37,7 +37,7 @@ const { levels, active, upcoming } = useRadio()
   display: grid;
   grid-template-columns: repeat(10, minmax(0, 1fr));
   gap: 0 4px;
-  padding: 8px 16px;
+  padding: 8px calc(16px + var(--safe-r)) 8px calc(16px + var(--safe-l));
   background: var(--bg-2);
   box-shadow: 0 -2px 0 0 var(--edge-dim), 0 2px 0 0 #0b0616;
 }
@@ -81,7 +81,7 @@ const { levels, active, upcoming } = useRadio()
   .strip {
     grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 4px 8px;
-    padding: 6px 16px;
+    padding: 6px calc(16px + var(--safe-r)) 6px calc(16px + var(--safe-l));
   }
   .strip__meter { display: none; }
   .strip__cell { height: 16px; }

@@ -86,13 +86,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey, true))
   z-index: 30;
   display: grid;
   place-items: center;
-  padding: 16px;
+  padding: max(16px, var(--safe-t)) calc(16px + var(--safe-r)) calc(16px + var(--app-safe-bottom)) calc(16px + var(--safe-l));
   background: rgba(11, 6, 22, 0.6);
 }
 
 .ch {
   width: min(640px, 100%);
-  max-height: calc(var(--app-height, 100dvh) - 32px);
+  max-height: calc(var(--app-height, 100dvh) - 32px - var(--safe-t) - var(--app-safe-bottom));
   display: flex;
   flex-direction: column;
   padding: 16px 16px 14px;
@@ -172,7 +172,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey, true))
 .ch__row { display: flex; justify-content: flex-end; gap: 12px; margin-top: 14px; }
 
 @media (max-width: 700px) {
-  .ch__veil { place-items: start center; padding-top: calc(12px + env(safe-area-inset-top, 0px)); }
+  .ch__veil { place-items: start center; padding-top: calc(12px + var(--safe-t)); }
   .ch__toggle { grid-template-columns: 20px minmax(0, 1fr); }
   .ch__blurb { display: none; }
   .ch__name { overflow: hidden; text-overflow: ellipsis; }

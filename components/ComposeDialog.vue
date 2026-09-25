@@ -111,7 +111,7 @@ onBeforeUnmount(() => { if (timer) clearInterval(timer) })
   z-index: 30;
   display: grid;
   place-items: center;
-  padding: 16px;
+  padding: max(16px, var(--safe-t)) calc(16px + var(--safe-r)) calc(16px + var(--app-safe-bottom)) calc(16px + var(--safe-l));
   background: rgba(11, 6, 22, 0.6);
 }
 
@@ -126,7 +126,7 @@ onBeforeUnmount(() => { if (timer) clearInterval(timer) })
 .cd p { margin: 0; }
 
 @media (max-width: 700px) {
-  .cd__veil { place-items: start center; padding-top: calc(12px + env(safe-area-inset-top, 0px)); }
+  .cd__veil { place-items: start center; padding-top: calc(12px + var(--safe-t)); }
 }
 
 .cd__title { color: var(--gold); text-shadow: 2px 2px 0 var(--bg); margin-bottom: 12px !important; }

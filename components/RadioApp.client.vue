@@ -355,7 +355,7 @@ onBeforeUnmount(() => {
     "dial knobs";
   grid-template-rows: auto 1fr;
   gap: 16px 40px;
-  padding: 16px 24px calc(16px + var(--app-safe-bottom));
+  padding: 16px calc(24px + var(--safe-r)) calc(16px + var(--app-safe-bottom)) calc(24px + var(--safe-l));
   background: var(--bg);
 }
 
@@ -405,8 +405,8 @@ onBeforeUnmount(() => {
 .app__working {
   position: absolute;
   z-index: 5;
-  left: 16px;
-  top: calc(84px + env(safe-area-inset-top, 0px));
+  left: calc(16px + var(--safe-l));
+  top: calc(84px + var(--safe-t));
   margin: 0;
   color: var(--gold);
   text-shadow: 2px 2px 0 var(--bg);
@@ -421,6 +421,19 @@ onBeforeUnmount(() => {
   .deck__knobs { gap: 4px; }
 }
 
+/* Phones on their side: the picture keeps the top half, the deck scrolls under it. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .app__strip { display: none !important; }
+  .app__deck {
+    max-height: calc(var(--app-height) * 0.5);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-top: 10px;
+    gap: 10px 28px;
+  }
+  .deck__knobs { gap: 2px; }
+}
+
 /* Phones: the window on top, the deck stacked under it. */
 @media (max-width: 700px) {
   .app { --pxs-label-w: 88px; }
@@ -429,13 +442,13 @@ onBeforeUnmount(() => {
     grid-template-areas: "transport" "dial" "knobs";
     grid-template-rows: auto auto auto;
     gap: 12px;
-    padding: 12px 16px calc(12px + var(--app-safe-bottom));
+    padding: 12px calc(16px + var(--safe-r)) calc(12px + var(--app-safe-bottom)) calc(16px + var(--safe-l));
   }
   .deck__transport { gap: 10px; flex-wrap: nowrap; }
   .deck__play { min-width: 0; flex: 1; padding: 0 8px; }
   .deck__thumb { width: 40px; flex: none; }
   .deck__note, .deck__hold { flex: none; padding: 0 8px; margin: 0; }
   .deck__knobs { gap: 4px; }
-  .app__working { top: calc(72px + env(safe-area-inset-top, 0px)); }
+  .app__working { top: calc(72px + var(--safe-t)); }
 }
 </style>
