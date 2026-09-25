@@ -118,3 +118,13 @@ feedback moves to D1, this service has nothing left to do. Then: `pm2 delete
 radio-api && pm2 save`, drop the nginx `/radio/` locations and the
 `phareim/radio` route in `sleeper-deploy`, and mark it retired in
 `~/github/sleeper/docs/agent-environment-reference.md`.
+
+## Listeners (2026-09-25)
+
+The Worker passes the signed-in member's email as `X-Radio-User` (trusted
+because only the Worker holds the Bearer key). Composed landscapes carry an
+`owner` and are listed and removable only by their owner (`GET /landscapes`
+without the header returns none). `GET` / `PUT /settings` keep a member's
+settings (`{ hidden: [channel ids] }`). Feedback rows record the `user`.
+Rows from before owners existed belong to `RADIO_LEGACY_OWNER`
+(default phareim@gmail.com); the migration runs on start.

@@ -5,5 +5,6 @@ import { asListener } from '~/server/utils/listener'
 export default defineEventHandler(async (event) => {
   const user = await requireAllowedUser(event)
   const body = await readBody(event)
-  return radioFetch(event, '/feedback', { method: 'POST', body: JSON.stringify(body), headers: asListener(user.email.toLowerCase()) })
+  const hidden = Array.isArray(body?.hidden) ? body.hidden.filter((x: unknown) => typeof x === 'string').slice(0, 200) : []
+  return radioFetch(event, '/settings', { method: 'PUT', body: JSON.stringify({ hidden }), headers: asListener(user.email.toLowerCase()) })
 })

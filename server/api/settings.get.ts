@@ -2,8 +2,8 @@ import { requireAllowedUser } from '~/server/utils/readerSession'
 import { radioFetch } from '~/server/utils/radioApi'
 import { asListener } from '~/server/utils/listener'
 
+/** The member's radio settings (hidden channels), the same on every device. */
 export default defineEventHandler(async (event) => {
   const user = await requireAllowedUser(event)
-  const body = await readBody(event)
-  return radioFetch(event, '/feedback', { method: 'POST', body: JSON.stringify(body), headers: asListener(user.email.toLowerCase()) })
+  return radioFetch(event, '/settings', { headers: asListener(user.email.toLowerCase()) })
 })

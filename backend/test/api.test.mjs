@@ -38,10 +38,12 @@ after(() => {
   rmSync(TMP, { recursive: true, force: true });
 });
 
-async function api(method, path, body, { key = KEY, headers = {} } = {}) {
+const USER = 'listener@example.com'
+
+async function api(method, path, body, { key = KEY, headers = {}, user = USER } = {}) {
   const res = await fetch(base + path, {
     method,
-    headers: { ...(key ? { authorization: `Bearer ${key}` } : {}), ...(body ? { 'content-type': 'application/json' } : {}), ...headers },
+    headers: { ...(key ? { authorization: `Bearer ${key}` } : {}), ...(user ? { 'x-radio-user': user } : {}), ...(body ? { 'content-type': 'application/json' } : {}), ...headers },
     body: body ? JSON.stringify(body) : undefined,
   });
   const text = await res.text();
@@ -137,6 +139,10 @@ test('compose: prompt, stamp, validate, store, list, hide', async () => {
 
   const listed = (await api('GET', '/landscapes')).body.landscapes;
   assert.deepEqual(listed.map((x) => x.id), [l.id]);
+  // Private to the composer: nobody else sees it or can remove it.
+  assert.deepEqual((await api('GET', '/landscapes', null, { user: 'other@example.com' })).body.landscapes, [])
+  assert.deepEqual((await api('GET', '/landscapes', null, { user: null })).body.landscapes, [])
+  assert.equal((await api('DELETE', `/landscapes/${l.id}`, null, { user: 'other@example.com' })).status, 404)
   assert.equal((await api('DELETE', `/landscapes/${l.id}`)).status, 200);
   assert.deepEqual((await api('GET', '/landscapes')).body.landscapes, []);
   assert.equal((await api('DELETE', '/landscapes/nope')).status, 404);
@@ -216,3 +222,13 @@ test('review: writes the report, marks feedback, lists it, skips when empty', as
   const second = await waitJob((await api('POST', '/review')).body.job.id);
   assert.match(second.result.review.path, /-2\.md$/);
 });
+
+test('settings: per listener, cleaned, required listener', async () => {
+  assert.equal((await api('GET', '/settings', null, { user: null })).status, 401)
+  assert.equal((await api('GET', '/settings')).body.settings, null)
+  const put = await api('PUT', '/settings', { hidden: ['jungle', 'jungle', 'bad id!', 42, 'deepspace'], extra: 1 })
+  assert.deepEqual(put.body.settings, { hidden: ['jungle', 'deepspace'] })
+  assert.deepEqual((await api('GET', '/settings')).body.settings, { hidden: ['jungle', 'deepspace'] })
+  assert.equal((await api('GET', '/settings', null, { user: 'other@example.com' })).body.settings, null)
+  assert.equal((await api('POST', '/compose', { prompt: 'x' }, { user: null })).status, 401)
+})

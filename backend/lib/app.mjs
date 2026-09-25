@@ -55,7 +55,7 @@ function corsHeaders(req, origins) {
   return {
     'access-control-allow-origin': origin,
     'access-control-allow-methods': 'GET, POST, PATCH, DELETE, OPTIONS',
-    'access-control-allow-headers': 'authorization, content-type',
+    'access-control-allow-headers': 'authorization, content-type, x-radio-user',
     'access-control-max-age': '600',
     vary: 'Origin',
   };
@@ -63,9 +63,31 @@ function corsHeaders(req, origins) {
 
 const str = (v, max) => (typeof v === 'string' ? v.slice(0, max) : '');
 
+/**
+ * The listener, as the Worker vouches for it: the signed-in email in
+ * X-Radio-User. Only trusted because every route but /health needs the
+ * Bearer key, which only the Worker holds.
+ */
+function listener(req) {
+  const u = String(req.headers['x-radio-user'] ?? '').trim().toLowerCase();
+  return /^[^\s@]{1,100}@[^\s@]{1,100}$/.test(u) ? u : null;
+}
+
+function needListener(req) {
+  const u = listener(req);
+  if (!u) throw new HttpError(401, 'X-Radio-User is required');
+  return u;
+}
+
+/** Settings a listener may keep: the channels hidden from their dial. */
+function cleanSettings(b) {
+  const hidden = Array.isArray(b?.hidden) ? b.hidden.filter((x) => typeof x === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(x)) : [];
+  return { hidden: [...new Set(hidden)].slice(0, 200) };
+}
+
 export function createApp({ db, apiKey, corsOrigins = [], ask }) {
   const jobs = createJobs(db, {
-    compose: (input) => composeLandscape({ db, prompt: input.prompt, base: input.base, ask }),
+    compose: (input) => composeLandscape({ db, prompt: input.prompt, base: input.base, owner: input.owner ?? null, ask }),
     review: () => runReview({ db, ask }),
   });
 
@@ -83,8 +105,8 @@ export function createApp({ db, apiKey, corsOrigins = [], ask }) {
       if (!landscape) throw new HttpError(400, 'snapshot.landscape is required');
       const comment = str(b.comment, 4000);
       if (b.rating === 0 && !comment.trim()) throw new HttpError(400, 'a comment-only entry needs a comment');
-      const r = db.prepare('INSERT INTO feedback (at, rating, comment, snapshot, landscape) VALUES (?, ?, ?, ?, ?)')
-        .run(now(), b.rating, comment, JSON.stringify(b.snapshot), landscape);
+      const r = db.prepare('INSERT INTO feedback (at, rating, comment, snapshot, landscape, user) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(now(), b.rating, comment, JSON.stringify(b.snapshot), landscape, listener(req));
       return [201, { id: Number(r.lastInsertRowid) }];
     }],
 
@@ -115,18 +137,39 @@ export function createApp({ db, apiKey, corsOrigins = [], ask }) {
       return { feedback: rows.map(feedbackRow) };
     }],
 
-    ['GET', /^\/landscapes$/, async () => {
-      const rows = db.prepare('SELECT json FROM landscapes WHERE hidden = 0 ORDER BY created_at').all();
+    // Composed landscapes are private to whoever composed them.
+    ['GET', /^\/landscapes$/, async (req) => {
+      const u = listener(req);
+      if (!u) return { landscapes: [] };
+      const rows = db.prepare('SELECT json FROM landscapes WHERE hidden = 0 AND owner = ? ORDER BY created_at').all(u);
       return { landscapes: rows.map((r) => JSON.parse(r.json)) };
     }],
 
-    ['DELETE', /^\/landscapes\/([A-Za-z0-9_-]+)$/, async (_req, [, id]) => {
-      const r = db.prepare('UPDATE landscapes SET hidden = 1 WHERE id = ?').run(id);
+    // Removing one keeps the row (hidden = 1), so it can be brought back by hand.
+    ['DELETE', /^\/landscapes\/([A-Za-z0-9_-]+)$/, async (req, [, id]) => {
+      const u = needListener(req);
+      const r = db.prepare('UPDATE landscapes SET hidden = 1 WHERE id = ? AND owner = ?').run(id, u);
       if (r.changes === 0) throw new HttpError(404, 'no such landscape');
       return { id, hidden: true };
     }],
 
+    ['GET', /^\/settings$/, async (req) => {
+      const u = needListener(req);
+      const row = db.prepare('SELECT json, updated_at FROM settings WHERE user = ?').get(u);
+      return { settings: row ? cleanSettings(JSON.parse(row.json)) : null, updatedAt: row?.updated_at ?? null };
+    }],
+
+    ['PUT', /^\/settings$/, async (req) => {
+      const u = needListener(req);
+      const settings = cleanSettings(await readJson(req));
+      const at = now();
+      db.prepare('INSERT INTO settings (user, json, updated_at) VALUES (?, ?, ?) ON CONFLICT(user) DO UPDATE SET json = excluded.json, updated_at = excluded.updated_at')
+        .run(u, JSON.stringify(settings), at);
+      return { settings, updatedAt: at };
+    }],
+
     ['POST', /^\/compose$/, async (req) => {
+      const owner = needListener(req);
       const b = await readJson(req);
       const prompt = typeof b.prompt === 'string' ? b.prompt.trim() : '';
       if (!prompt) throw new HttpError(400, 'prompt is required');
@@ -139,7 +182,7 @@ export function createApp({ db, apiKey, corsOrigins = [], ask }) {
         }
         base = b.base;
       }
-      return [202, { job: jobs.enqueue('compose', { prompt, base }) }];
+      return [202, { job: jobs.enqueue('compose', { prompt, base, owner }) }];
     }],
 
     ['POST', /^\/review$/, async () => [202, { job: jobs.enqueue('review', {}) }]],

@@ -10,17 +10,11 @@
     </div>
     <p class="dial__blurb">
       <span>{{ target.blurb }}</span>
-      <button
-        v-if="canCompose && target.origin === 'opus'"
-        type="button"
-        class="dial__hide"
-        @click="hideTarget"
-      >{{ confirmHide ? 'SURE? ×' : '× HIDE' }}</button>
     </p>
 
     <div class="dial__grid" role="radiogroup" aria-label="Places">
       <button
-        v-for="(L, i) in landscapes"
+        v-for="(L, i) in visible"
         :key="L.id"
         type="button"
         role="radio"
@@ -34,9 +28,9 @@
         <span class="dial__num">{{ L.origin === 'opus' ? '◈' : i < 10 ? (i + 1) % 10 : '' }}</span>
         <span class="dial__name">{{ L.name }}</span>
       </button>
-      <button v-if="canCompose" type="button" class="dial__st dial__new" title="Ask Opus to compose a new place" @click="$emit('compose')">
-        <span class="dial__num">+</span>
-        <span class="dial__name">NEW PLACE</span>
+      <button type="button" class="dial__st dial__new" title="CHOOSE WHICH CHANNELS SHOW, OR COMPOSE A NEW ONE [C]" @click="$emit('channels')">
+        <span class="dial__num">■</span>
+        <span class="dial__name">CHANNELS</span>
       </button>
     </div>
   </div>
@@ -50,30 +44,20 @@
  */
 import { computed, ref, watch } from 'vue'
 
-defineProps<{ canCompose?: boolean }>()
-defineEmits<{ compose: [] }>()
+defineEmits<{ channels: [] }>()
+const { visible } = useChannels()
 
-const { controls, hud, landscapes, set, landscapeOf } = useRadio()
-const { hide } = usePlaces()
-const { say } = useFeedback()
+const { controls, hud, set, landscapeOf } = useRadio()
 
 const target = computed(() => landscapeOf(controls.landscape))
 const moving = computed(() => controls.landscape !== hud.landscape)
-const confirmHide = ref(false)
-watch(() => controls.landscape, () => { confirmHide.value = false })
 
 function step(d: number): void {
-  const list = landscapes.value
+  const list = visible.value
   const i = list.findIndex(l => l.id === controls.landscape)
   set({ landscape: list[(i + d + list.length) % list.length]!.id })
 }
 
-async function hideTarget(): Promise<void> {
-  if (!confirmHide.value) { confirmHide.value = true; return }
-  confirmHide.value = false
-  const ok = await hide(target.value.id)
-  say(ok ? 'HIDDEN' : 'COULD NOT HIDE', ok ? 'ok' : 'warn')
-}
 </script>
 
 <style scoped>
@@ -129,16 +113,6 @@ async function hideTarget(): Promise<void> {
 }
 .dial__blurb span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.dial__hide {
-  flex: none;
-  padding: 0;
-  background: transparent;
-  border: 0;
-  font-size: 16px;
-  line-height: 16px;
-  color: var(--gold);
-  cursor: pointer;
-}
 
 .dial__grid {
   display: grid;

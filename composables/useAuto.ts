@@ -11,6 +11,7 @@ import { ref } from 'vue'
 import type { Landscape } from '~/engine/types.ts'
 import { load, save } from './storage'
 import { useRadio } from './useRadio'
+import { useChannels } from './useChannels'
 
 const AUTO_KEY = 'radio.auto'
 const MIN_STAY = 7 * 60
@@ -48,11 +49,12 @@ function pickNext(list: Landscape[], from: Landscape): Landscape {
 
 /** Glide to the next place now (auto or not). */
 function glideOn(): void {
-  const { controls, landscapes, landscapeOf, set } = useRadio()
+  const { controls, landscapeOf, set } = useRadio()
+  const { visible } = useChannels()
   const from = landscapeOf(controls.landscape)
   recent.unshift(from.id)
   recent.length = Math.min(recent.length, 3)
-  set({ landscape: pickNext(landscapes.value, from).id })
+  set({ landscape: pickNext(visible.value, from).id })
   heard = 0
   stay = pickStay()
   left.value = stay

@@ -61,7 +61,7 @@
         >HOLD</button>
       </div>
 
-      <StationDial class="deck__dial" :can-compose="allowed" @compose="composeOpen = true" />
+      <StationDial class="deck__dial" @channels="channelsOpen = true" />
 
       <div class="deck__knobs">
         <IntensityBar />
@@ -107,6 +107,7 @@
     </div>
 
     <CommentBox />
+    <ChannelsDialog v-if="channelsOpen" @close="channelsOpen = false" @compose="channelsOpen = false; composeOpen = true" />
     <ComposeDialog v-if="composeOpen" @close="composeOpen = false" />
     <p v-if="toast" :key="toast.n" class="app__toast px-box" :class="{ warn: toast.tone === 'warn' }" role="status">{{ toast.text }}</p>
     <p v-if="composing && !composeOpen" class="app__working" @click="composeOpen = true">
@@ -153,6 +154,8 @@ function setCalm(on: boolean): void {
 }
 
 const composeOpen = ref(false)
+const channelsOpen = ref(false)
+const { visible, sync } = useChannels()
 const composing = computed(() => compose.value.phase === 'working')
 const narrow = ref(false)
 const audioEl = ref<HTMLAudioElement | null>(null)
@@ -227,7 +230,7 @@ function setMetadata(): void {
 }
 
 function stepPlace(d: number): void {
-  const list = landscapes.value
+  const list = visible.value
   const i = list.findIndex(l => l.id === controls.landscape)
   set({ landscape: list[(i + d + list.length) % list.length]!.id })
 }
@@ -255,6 +258,8 @@ function typing(t: EventTarget | null): boolean {
 
 function onKey(e: KeyboardEvent): void {
   if (e.metaKey || e.ctrlKey || e.altKey || typing(e.target)) return
+  // The channel list handles its own Escape and takes no other keys.
+  if (channelsOpen.value) return
   if (e.key === 'Escape') {
     if (composeOpen.value) { composeOpen.value = false; e.preventDefault() }
     else if (calm.value) { setCalm(false); e.preventDefault() }
@@ -266,7 +271,7 @@ function onKey(e: KeyboardEvent): void {
   let handled = true
   if (k === ' ' || e.code === 'Space') { if (!e.repeat) toggle() }
   else if (/^[0-9]$/.test(k)) {
-    const L = landscapes.value[k === '0' ? 9 : Number(k) - 1]
+    const L = visible.value[k === '0' ? 9 : Number(k) - 1]
     if (L) set({ landscape: L.id })
   }
   else if (k === 'ArrowLeft') stepPlace(-1)
@@ -277,6 +282,7 @@ function onKey(e: KeyboardEvent): void {
   else if (k === 'a' || k === 'A') { if (!e.repeat) toggleAuto() }
   else if (k === 'g' || k === 'G') { if (!e.repeat) glideOn() }
   else if (k === 'd' || k === 'D') { if (!e.repeat) setCalm(!calm.value) }
+  else if (k === 'c' || k === 'C') { if (!e.repeat) channelsOpen.value = true }
   else if (k === 'm' || k === 'M') { if (!e.repeat) toggleMute() }
   else if (allowed.value && (k === '+' || k === '=' || e.code === 'NumpadAdd')) { if (!e.repeat) void rate(1) }
   else if (allowed.value && (k === '-' || k === '_' || e.code === 'NumpadSubtract')) { if (!e.repeat) void rate(-1) }
@@ -304,6 +310,7 @@ onMounted(() => {
   void refresh()
   void fetchSession().then((ok) => {
     if (!ok) return
+    void sync()
     resume()
     void flush()
   })

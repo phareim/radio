@@ -19,7 +19,8 @@ pages/index.vue            the shell, RadioApp inside <ClientOnly>
 components/
   RadioApp.client.vue      layout, keyboard, media session, hidden <audio>
   SceneWindow.vue          the canvas (scene/createScene) and the HUD over it
-  StationDial.vue          places: built-ins (1–0), Opus's (◈), + NEW PLACE
+  StationDial.vue          the channels shown (1–0), then CHANNELS
+  ChannelsDialog.vue       show/hide each channel, remove your own, + NEW PLACE
   IntensityBar.vue         STILL … SURGE
   PxSlider.vue             segmented knobs (mood, space, grit, density, tempo, volume)
   LayerStrip.vue           the ten layers lit by level, entries counting down
@@ -29,7 +30,9 @@ components/
 composables/
   useRadio.ts              controls, the conductor and player, HUD state
   useFeedback.ts           thumbs and notes, with an outbox in localStorage
-  usePlaces.ts             composed places: load, compose job, hide
+  usePlaces.ts             your composed places: load, compose job, remove
+  useChannels.ts           which channels show: this browser, or a member's settings on radio-api
+  useAuto.ts               AUTO: slow drift from place to place
 server/api/                proxies to radio-api, each gated by requireAllowedUser
 server/utils/              readerSession.ts + cloudflare.ts (vendored Reader auth), radioApi.ts
 scripts/make-icons.py      favicon, apple-touch and manifest icons (Pillow)
@@ -42,6 +45,10 @@ scripts/make-icons.py      favicon, apple-touch and manifest icons (Pillow)
 - Keys: Space play/pause, 1–9 and 0 places, ← → previous/next place, ↑ ↓
   intensity, H hold, A auto, G glide on, D dim, M mute; signed in: + / −
   thumbs, N note; signed out: L goes to Reader's login. Ignored while typing.
+- Channels: composed places are private to whoever composed them (radio-api
+  keeps an owner per landscape; the Worker passes the member's email as
+  `X-Radio-User`). Which channels show is kept per browser, or for members
+  in radio-api's `settings` table, so it follows them to every device.
 - DIM (`radio.calm`) hides everything but the picture; AUTO, ▶▶ and SHOW
   stay in the corner and fade after a few seconds without the pointer.
 - AUTO (`composables/useAuto.ts`) stays 7–11 listening minutes in a place,

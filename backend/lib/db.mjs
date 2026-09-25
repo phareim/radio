@@ -1,4 +1,4 @@
-// SQLite store (node:sqlite). One file, four tables.
+// SQLite store (node:sqlite). One file, five tables.
 
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
@@ -37,6 +37,14 @@ CREATE TABLE IF NOT EXISTS jobs (
   finished_at TEXT
 );
 
+-- Per-listener settings (which channels show on the dial), keyed by the
+-- signed-in email the Worker passes in X-Radio-User.
+CREATE TABLE IF NOT EXISTS settings (
+  user TEXT PRIMARY KEY,
+  json TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS reviews (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   at TEXT NOT NULL,
@@ -52,7 +60,26 @@ export function openDb(file) {
   const db = new DatabaseSync(file);
   db.exec('PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;');
   db.exec(SCHEMA);
+  migrate(db);
   return db;
+}
+
+/**
+ * Columns added after the first release (2026-09-25): a composed landscape
+ * belongs to whoever composed it, and feedback remembers who gave it. Rows
+ * from before then were all Petter's.
+ */
+function migrate(db) {
+  const cols = (t) => db.prepare(`PRAGMA table_info(${t})`).all().map((c) => c.name);
+  const legacy = process.env.RADIO_LEGACY_OWNER || 'phareim@gmail.com';
+  if (!cols('landscapes').includes('owner')) {
+    db.exec('ALTER TABLE landscapes ADD COLUMN owner TEXT');
+    db.prepare('UPDATE landscapes SET owner = ? WHERE owner IS NULL').run(legacy);
+  }
+  if (!cols('feedback').includes('user')) {
+    db.exec('ALTER TABLE feedback ADD COLUMN user TEXT');
+    db.prepare('UPDATE feedback SET user = ? WHERE user IS NULL').run(legacy);
+  }
 }
 
 export const now = () => new Date().toISOString();

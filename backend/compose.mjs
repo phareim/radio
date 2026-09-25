@@ -131,7 +131,7 @@ function check(reply, { db, prompt, id, validateLandscape, LANDSCAPES }) {
  * Compose, validate (one repair round), store. Throws with the validator's
  * errors if the repaired landscape is still invalid.
  */
-export async function composeLandscape({ db, prompt, base, ask = askOpus }) {
+export async function composeLandscape({ db, prompt, base, owner = null, ask = askOpus }) {
   const { validateLandscape, LANDSCAPES } = await loadEngine();
   if (base && !LANDSCAPES[base]) throw new Error(`unknown base landscape ${base}`);
   const ctx = { db, prompt, validateLandscape, LANDSCAPES };
@@ -148,7 +148,7 @@ export async function composeLandscape({ db, prompt, base, ask = askOpus }) {
   if (!res.ok) throw new Error(`landscape still invalid after one repair: ${res.errors.join('; ')}`);
 
   const l = res.landscape;
-  db.prepare('INSERT INTO landscapes (id, name, json, prompt, created_at) VALUES (?, ?, ?, ?, ?)')
-    .run(l.id, String(l.name ?? l.id), JSON.stringify(l), prompt, now());
+  db.prepare('INSERT INTO landscapes (id, name, json, prompt, created_at, owner) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(l.id, String(l.name ?? l.id), JSON.stringify(l), prompt, now(), owner);
   return { landscape: l, repaired };
 }
