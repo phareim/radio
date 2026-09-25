@@ -45,9 +45,18 @@ where a musician would put them:
 The conductor plans lazily, one bar at a time, so a new control value
 re-plans from wherever the music is.
 
-## The player (engine/audio/player.ts)
+## The player (engine/audio/)
 
-`createPlayer(conductor: ConductorLike): RadioPlayer` (types in `types.ts`).
+`createPlayer(conductor: ConductorLike): RadioPlayer` in `player.ts` (types
+in `types.ts`) is the live wrapper: AudioContext, Worker clock, volume, the
+MediaStream and `setOutput('speakers' | 'stream')` (the page plays the stream
+through an `<audio>` element for iOS lock-screen playback and then turns the
+direct speaker output off). The scheduling itself lives in `core.ts` and runs
+on any `BaseAudioContext`, so `tests/audio-check.mjs` renders it offline in
+headless Chromium and meters every voice, kit, texture and landscape
+(`npm run check:audio -- [filter] [--wav]`; WAVs go to `~/zshots/radio-audio/`).
+A texture missing from `BarPlan.ambience` fades to 0; a layer missing from
+`mix` keeps its previous target.
 
 - **Clock**: a lookahead scheduler ticking from a Web Worker (timers in a
   hidden tab's main thread are throttled to 1 Hz; worker timers are not).

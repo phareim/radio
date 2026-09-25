@@ -132,23 +132,20 @@ function toggle(): void {
 /**
  * Play the master stream through the hidden <audio> element, so the OS
  * treats the page as a media player (lock screen, media keys, background
- * playback). Only where the AudioContext's own output can be silenced
- * (setSinkId 'none', Chromium): elsewhere the element would double the music,
- * so the context plays straight to the speakers.
+ * playback on iOS). Once the element plays, the player stops feeding the
+ * speakers directly so the music is not doubled; if the element will not
+ * play, the player keeps its own speaker output.
  */
 let routed = false
 function routeToElement(): void {
   const el = audioEl.value
   const stream = radio.stream()
-  const ac = radio.context() as (AudioContext & { setSinkId?: (id: string | { type: 'none' }) => Promise<void> }) | null
-  if (!el || !stream || !ac) return
+  if (!el || !stream) return
   if (routed) { el.play().catch(() => {}); return }
-  if (typeof ac.setSinkId !== 'function') return
   if (el.srcObject !== stream) el.srcObject = stream
   el.play()
-    .then(() => ac.setSinkId!({ type: 'none' }))
-    .then(() => { routed = true })
-    .catch(() => { el.pause(); el.srcObject = null })
+    .then(() => { radio.setOutput('stream'); routed = true })
+    .catch(() => { el.pause(); el.srcObject = null; radio.setOutput('speakers') })
 }
 
 // ---- media session -------------------------------------------------------------

@@ -295,45 +295,45 @@ const KITS: Record<KitId, Kit> = {
   // Punchy kick, big gated snare, crisp hats, clap; Simmons toms into the gated room.
   'kit.synthwave': {
     k: { fn: kick(155, 44, 0.035, 0.16, 0.35), lvl: 0.78 },
-    s: { fn: snare(185, 0.09, 1300, 9000, 0.07, 0.55), lvl: 0.42, gated: 0.8 },
-    c: { fn: (h, vel) => clapHit(h, 1250, 1.1, 4, 0.009, 0.06, 0.9 * (0.6 + 0.4 * vel)), lvl: 0.36, gated: 0.8 },
-    h: { fn: hat('metal', 7500, 0.012, 0.9, 10000), lvl: 0.2, pan: 0.18 },
-    o: { fn: hat('metal', 6800, 0.075, 0.8, 9500), lvl: 0.17, pan: 0.18 },
-    r: { fn: ride(5200, 0.28, 0.55, 0.08), lvl: 0.14, pan: 0.3 },
-    p: { fn: shaker(7000, 0.006, 0.03, 0.7), lvl: 0.18, pan: -0.25 },
-    t: { fn: tom(95, 0.16, 0.3), lvl: 0.5, pan: -0.3, gated: 0.5 },
-    m: { fn: tom(135, 0.14, 0.3), lvl: 0.46, pan: 0, gated: 0.5 },
-    T: { fn: tom(190, 0.12, 0.3), lvl: 0.42, pan: 0.3, gated: 0.5 },
-    x: { fn: crash(3800, 0.55, 1), lvl: 0.2, pan: -0.15 },
+    s: { fn: snare(185, 0.09, 1300, 9000, 0.07, 0.55), lvl: 0.666, gated: 0.8 },
+    c: { fn: (h, vel) => clapHit(h, 1250, 1.1, 4, 0.009, 0.06, 0.9 * (0.6 + 0.4 * vel)), lvl: 0.718, gated: 0.8 },
+    h: { fn: hat('metal', 7500, 0.012, 0.9, 10000), lvl: 0.71, pan: 0.18 },
+    o: { fn: hat('metal', 6800, 0.075, 0.8, 9500), lvl: 0.479, pan: 0.18 },
+    r: { fn: ride(5200, 0.28, 0.55, 0.08), lvl: 0.279, pan: 0.3 },
+    p: { fn: shaker(7000, 0.006, 0.03, 0.7), lvl: 0.32, pan: -0.25 },
+    t: { fn: tom(95, 0.16, 0.3), lvl: 0.397, pan: -0.3, gated: 0.5 },
+    m: { fn: tom(135, 0.14, 0.3), lvl: 0.365, pan: 0, gated: 0.5 },
+    T: { fn: tom(190, 0.12, 0.3), lvl: 0.334, pan: 0.3, gated: 0.5 },
+    x: { fn: crash(3800, 0.55, 1), lvl: 0.252, pan: -0.15 },
     z: { fn: (h, _v, len) => riser(h, len, { from: 500, to: 7000, q: 1.3, lvl: 0.7 }), lvl: 0.24 },
   },
   // Lofi: round kick, soft papery snare, dusty hats, rim.
   'kit.soft': {
     k: { fn: kick(115, 48, 0.045, 0.2, 0, 900), lvl: 0.8 },
-    s: { fn: snare(170, 0.07, 900, 4500, 0.06, 0.5, 0.45), lvl: 0.34 },
-    c: { fn: (h, vel) => clapHit(h, 1000, 0.9, 3, 0.011, 0.05, 0.8 * (0.6 + 0.4 * vel), 4500), lvl: 0.28 },
-    h: { fn: hat('white', 5000, 0.018, 0.8, 7500), lvl: 0.14, pan: 0.2 },
-    o: { fn: hat('white', 4500, 0.08, 0.7, 7000), lvl: 0.11, pan: 0.2 },
-    r: { fn: ride(4200, 0.35, 0.5, 0.05, 560), lvl: 0.1, pan: 0.3 },
-    p: { fn: rim(1500), lvl: 0.24, pan: -0.2 },
+    s: { fn: snare(170, 0.07, 900, 4500, 0.06, 0.5, 0.45), lvl: 0.605 },
+    c: { fn: (h, vel) => clapHit(h, 1000, 0.9, 3, 0.011, 0.05, 0.8 * (0.6 + 0.4 * vel), 4500), lvl: 0.559 },
+    h: { fn: hat('white', 5000, 0.018, 0.8, 7500), lvl: 0.279, pan: 0.2 },
+    o: { fn: hat('white', 4500, 0.08, 0.7, 7000), lvl: 0.219, pan: 0.2 },
+    r: { fn: ride(4200, 0.35, 0.5, 0.05, 560), lvl: 0.251, pan: 0.3 },
+    p: { fn: rim(1500), lvl: 0.269, pan: -0.2 },
     t: { fn: tom(90, 0.18, 0, 'sine', 1200), lvl: 0.45, pan: -0.25 },
     m: { fn: tom(125, 0.16, 0, 'sine', 1400), lvl: 0.42, pan: 0 },
     T: { fn: tom(170, 0.14, 0, 'sine', 1600), lvl: 0.4, pan: 0.25 },
-    x: { fn: crash(3000, 0.5, 1, 7000), lvl: 0.12, pan: -0.15 },
-    z: { fn: (h, _v, len) => riser(h, len, { buf: h.v.res.pink, from: 400, to: 3500, q: 1, lvl: 0.7 }), lvl: 0.18 },
+    x: { fn: crash(3000, 0.5, 1, 7000), lvl: 0.151, pan: -0.15 },
+    z: { fn: (h, _v, len) => riser(h, len, { buf: h.v.res.pink, from: 400, to: 3500, q: 1, lvl: 1.76 }), lvl: 0.18 },
   },
   // Skins and wood: deep kick, djembe slap, group claps, shakers, congas, woodblock, low gong swell.
   'kit.tribal': {
     k: { fn: kick(95, 42, 0.05, 0.3, 0.12, 1500), lvl: 0.8 },
-    s: { fn: both(conga(330, 0.06, 0.9), (h) => noiseHit(h, { filters: [['bandpass', 1500, 0.9]], decay: 0.04, lvl: 0.5 })), lvl: 0.4, pan: 0.15 },
-    c: { fn: (h, vel) => clapHit(h, 1100, 0.8, 6, 0.014, 0.07, 0.8 * (0.6 + 0.4 * vel), 6000), lvl: 0.3, pan: -0.1 },
-    h: { fn: shaker(6200, 0.012, 0.035, 0.8), lvl: 0.2, pan: 0.3 },
-    o: { fn: shaker(5200, 0.04, 0.08, 0.7), lvl: 0.18, pan: 0.3 },
+    s: { fn: both(conga(330, 0.06, 0.9), (h) => noiseHit(h, { filters: [['bandpass', 1500, 0.9]], decay: 0.04, lvl: 0.629 })), lvl: 0.4, pan: 0.15 },
+    c: { fn: (h, vel) => clapHit(h, 1100, 0.8, 6, 0.014, 0.07, 0.8 * (0.6 + 0.4 * vel), 6000), lvl: 0.533, pan: -0.1 },
+    h: { fn: shaker(6200, 0.012, 0.035, 0.8), lvl: 0.317, pan: 0.3 },
+    o: { fn: shaker(5200, 0.04, 0.08, 0.7), lvl: 0.285, pan: 0.3 },
     r: { fn: echo(block(1350, 0.05), 0.11, 0.6), lvl: 0.18, pan: -0.35 },
     p: { fn: conga(240, 0.13, 0.5), lvl: 0.36, pan: -0.3 },
     t: { fn: tom(78, 0.28, 0.2), lvl: 0.52, pan: -0.25 },
     m: { fn: tom(108, 0.24, 0.2), lvl: 0.48, pan: 0.05 },
-    T: { fn: block(820, 0.06), lvl: 0.24, pan: 0.35 },
+    T: { fn: block(820, 0.06), lvl: 0.339, pan: 0.35 },
     x: {
       fn: h => {
         // Low gong: inharmonic partials swelling slightly, long decay.
@@ -341,37 +341,37 @@ const KITS: Record<KitId, Kit> = {
           body(h, { f0: 98 * r, f1: 96 * r, pTau: 0.6, decay: 0.9, lvl: l, type: 'sine' })
         }
       },
-      lvl: 0.26,
+      lvl: 0.13,
     },
     z: { fn: (h, _v, len) => riser(h, len, { from: 3000, to: 8000, q: 1.5, lvl: 0.6 }), lvl: 0.2 },
   },
   // Brushes: soft kick, swishes, cross-stick, jazz ride with a bell.
   'kit.brush': {
     k: { fn: kick(95, 50, 0.04, 0.17, 0, 700), lvl: 0.66 },
-    s: { fn: (h, vel) => noiseHit(h, { buf: h.v.res.pink, filters: [['bandpass', 2600, 0.8], ['lowpass', 6000, 0.5]], attack: 0.012, decay: 0.07 + 0.05 * vel, lvl: 1 }), lvl: 0.3 },
-    c: { fn: h => noiseHit(h, { buf: h.v.res.pink, filters: [['bandpass', 2200, 1.1]], attack: 0.03, hold: 0.05, decay: 0.07, sweepTo: 3600, sweep: 0.12, lvl: 1 }), lvl: 0.24 },
-    h: { fn: hat('metal', 6000, 0.02, 0.6, 8000), lvl: 0.12, pan: 0.22 },
-    o: { fn: hat('metal', 5200, 0.12, 0.55, 7500), lvl: 0.1, pan: 0.22 },
-    r: { fn: ride(5000, 0.4, 0.6, 0.12, 700), lvl: 0.13, pan: 0.35 },
-    p: { fn: rim(1350), lvl: 0.2, pan: -0.15 },
+    s: { fn: (h, vel) => noiseHit(h, { buf: h.v.res.pink, filters: [['bandpass', 2600, 0.8], ['lowpass', 6000, 0.5]], attack: 0.012, decay: 0.07 + 0.05 * vel, lvl: 2 }), lvl: 0.3 },
+    c: { fn: h => noiseHit(h, { buf: h.v.res.pink, filters: [['bandpass', 2200, 1.1]], attack: 0.03, hold: 0.05, decay: 0.07, sweepTo: 3600, sweep: 0.12, lvl: 2 }), lvl: 0.24 },
+    h: { fn: hat('metal', 6000, 0.02, 0.6, 8000), lvl: 0.601, pan: 0.22 },
+    o: { fn: hat('metal', 5200, 0.12, 0.55, 7500), lvl: 0.398, pan: 0.22 },
+    r: { fn: ride(5000, 0.4, 0.6, 0.12, 700), lvl: 0.231, pan: 0.35 },
+    p: { fn: rim(1350), lvl: 0.252, pan: -0.15 },
     t: { fn: tom(88, 0.2, 0.1, 'sine', 900), lvl: 0.4, pan: -0.25 },
     m: { fn: tom(120, 0.18, 0.1, 'sine', 1100), lvl: 0.38, pan: 0 },
     T: { fn: tom(160, 0.15, 0.1, 'sine', 1300), lvl: 0.36, pan: 0.25 },
-    x: { fn: crash(3500, 0.6, 1, 8000), lvl: 0.1, pan: 0.3 },
-    z: { fn: (h, _v, len) => riser(h, len, { buf: h.v.res.pink, from: 1200, to: 5000, q: 0.8, lvl: 0.6 }), lvl: 0.16 },
+    x: { fn: crash(3500, 0.6, 1, 8000), lvl: 0.141, pan: 0.3 },
+    z: { fn: (h, _v, len) => riser(h, len, { buf: h.v.res.pink, from: 1200, to: 5000, q: 0.8, lvl: 1.2 }), lvl: 0.16 },
   },
   // Dry and tight: short kick, tight snare, closed sixteenth hats, tambourine.
   'kit.motorik': {
     k: { fn: kick(130, 50, 0.025, 0.11, 0.3), lvl: 0.76 },
-    s: { fn: snare(220, 0.05, 1600, 10000, 0.04, 0.55, 0.5), lvl: 0.38 },
-    c: { fn: (h, vel) => clapHit(h, 1400, 1.2, 3, 0.008, 0.035, 0.9 * (0.6 + 0.4 * vel)), lvl: 0.3 },
-    h: { fn: hat('metal', 8500, 0.008, 0.9, 11000), lvl: 0.2, pan: 0.15 },
-    o: { fn: hat('metal', 7500, 0.04, 0.8, 10000), lvl: 0.16, pan: 0.15 },
-    r: { fn: ride(6000, 0.22, 0.6, 0.06, 760), lvl: 0.12, pan: 0.3 },
+    s: { fn: snare(220, 0.05, 1600, 10000, 0.04, 0.55, 0.5), lvl: 0.537 },
+    c: { fn: (h, vel) => clapHit(h, 1400, 1.2, 3, 0.008, 0.035, 0.9 * (0.6 + 0.4 * vel)), lvl: 0.533 },
+    h: { fn: hat('metal', 8500, 0.008, 0.9, 11000), lvl: 1, pan: 0.15 },
+    o: { fn: hat('metal', 7500, 0.04, 0.8, 10000), lvl: 0.637, pan: 0.15 },
+    r: { fn: ride(6000, 0.22, 0.6, 0.06, 760), lvl: 0.301, pan: 0.3 },
     p: {
       fn: h => {
         // Tambourine: jingles (metal, band-passed high) with a short shake.
-        noiseHit(h, { buf: h.v.res.metal, rate: 1.3, filters: [['bandpass', 9000, 2], ['highpass', 6000, 0.7]], decay: 0.05, lvl: 1 })
+        noiseHit(h, { buf: h.v.res.metal, rate: 1.3, filters: [['bandpass', 9000, 2], ['highpass', 6000, 0.7]], decay: 0.05, lvl: 2.51 })
         noiseHit(h, { filters: [['highpass', 7000, 0.7]], attack: 0.003, decay: 0.02, lvl: 0.4 })
       },
       lvl: 0.16, pan: -0.25,
@@ -379,43 +379,43 @@ const KITS: Record<KitId, Kit> = {
     t: { fn: tom(100, 0.1, 0.2), lvl: 0.48, pan: -0.25 },
     m: { fn: tom(140, 0.09, 0.2), lvl: 0.44, pan: 0 },
     T: { fn: tom(190, 0.08, 0.2), lvl: 0.4, pan: 0.25 },
-    x: { fn: crash(4500, 0.4, 1), lvl: 0.16, pan: 0.2 },
-    z: { fn: (h, _v, len) => riser(h, len, { from: 800, to: 9000, q: 2, lvl: 0.6 }), lvl: 0.2 },
+    x: { fn: crash(4500, 0.4, 1), lvl: 0.201, pan: 0.2 },
+    z: { fn: (h, _v, len) => riser(h, len, { from: 800, to: 9000, q: 2, lvl: 0.848 }), lvl: 0.2 },
   },
   // Muffled and low: a double-thump kick, thuds, almost no highs.
   'kit.heartbeat': {
     k: { fn: echo(kick(78, 40, 0.04, 0.16, 0, 400), 0.19, 0.6), lvl: 0.9 },
     s: { fn: both(tom(110, 0.1, 0, 'sine', 500), h => noiseHit(h, { buf: h.v.res.brown, filters: [['lowpass', 700, 0.7]], decay: 0.06, lvl: 0.6 })), lvl: 0.42 },
-    c: { fn: (h, vel) => clapHit(h, 700, 0.8, 3, 0.012, 0.05, 0.8 * (0.6 + 0.4 * vel), 1400), lvl: 0.24 },
-    h: { fn: h => noiseHit(h, { buf: h.v.res.pink, filters: [['bandpass', 2600, 1.2], ['lowpass', 3500, 0.5]], decay: 0.012, lvl: 1 }), lvl: 0.06, pan: 0.15 },
+    c: { fn: (h, vel) => clapHit(h, 700, 0.8, 3, 0.012, 0.05, 0.8 * (0.6 + 0.4 * vel), 1400), lvl: 0.38 },
+    h: { fn: h => noiseHit(h, { buf: h.v.res.pink, filters: [['bandpass', 2600, 1.2], ['lowpass', 3500, 0.5]], decay: 0.012, lvl: 2 }), lvl: 0.06, pan: 0.15 },
     o: { fn: h => noiseHit(h, { buf: h.v.res.pink, filters: [['lowpass', 1800, 0.6]], attack: 0.05, decay: 0.15, lvl: 1 }), lvl: 0.08 },
     r: { fn: h => body(h, { f0: 330, f1: 330, pTau: 1, decay: 0.3, lvl: 1, lp: 900 }), lvl: 0.1, pan: 0.2 },
     p: { fn: h => body(h, { f0: 420, f1: 360, pTau: 0.02, decay: 0.03, lvl: 1, lp: 1000 }), lvl: 0.2, pan: -0.2 },
     t: { fn: tom(62, 0.24, 0, 'sine', 380), lvl: 0.55, pan: -0.2 },
     m: { fn: tom(80, 0.2, 0, 'sine', 420), lvl: 0.5 },
     T: { fn: tom(100, 0.18, 0, 'sine', 480), lvl: 0.46, pan: 0.2 },
-    x: { fn: h => noiseHit(h, { buf: h.v.res.brown, filters: [['lowpass', 1200, 0.5]], attack: 0.1, decay: 0.6, lvl: 1 }), lvl: 0.2 },
-    z: { fn: (h, _v, len) => riser(h, len, { buf: h.v.res.brown, from: 200, to: 1500, q: 0.7, lvl: 0.8 }), lvl: 0.3 },
+    x: { fn: h => noiseHit(h, { buf: h.v.res.brown, filters: [['lowpass', 1200, 0.5]], attack: 0.1, decay: 0.6, lvl: 1.26 }), lvl: 0.2 },
+    z: { fn: (h, _v, len) => riser(h, len, { buf: h.v.res.brown, from: 200, to: 1500, q: 0.7, lvl: 2.01 }), lvl: 0.3 },
   },
   // NES: triangle-channel kick and toms, LFSR noise snare and hats, pulse blip.
   'kit.chip': {
     k: {
       fn: h => {
-        body(h, { f0: 200, f1: 48, pTau: 0.025, decay: 0.09, lvl: 1, type: 'triangle' })
+        body(h, { f0: 200, f1: 48, pTau: 0.025, decay: 0.09, lvl: 1.26, type: 'triangle' })
         noiseHit(h, { buf: h.v.res.nesLong, rate: 0.5, filters: [['lowpass', 5000, 0.5]], decay: 0.01, lvl: 0.3 })
       },
       lvl: 0.8,
     },
     s: {
       fn: h => {
-        noiseHit(h, { buf: h.v.res.nesLong, rate: 0.7, filters: [['lowpass', 9000, 0.5], ['highpass', 400, 0.7]], decay: 0.06, lvl: 1 })
+        noiseHit(h, { buf: h.v.res.nesLong, rate: 0.7, filters: [['lowpass', 9000, 0.5], ['highpass', 400, 0.7]], decay: 0.06, lvl: 0.794 })
         body(h, { f0: 330, f1: 180, pTau: 0.02, decay: 0.04, lvl: 0.35, type: 'triangle' })
       },
       lvl: 0.32,
     },
     c: { fn: h => { for (let i = 0; i < 3; i++) noiseHit(h, { buf: h.v.res.nesLong, rate: 0.6, filters: [['bandpass', 1600, 0.8]], decay: 0.012, lvl: 1, delay: i * 0.018 }) }, lvl: 0.34 },
-    h: { fn: hat('nesShort', 4000, 0.01, 0.8, undefined, 1.6), lvl: 0.12, pan: 0.15 },
-    o: { fn: hat('nesLong', 5000, 0.06, 0.8, undefined, 0.9), lvl: 0.12, pan: 0.15 },
+    h: { fn: hat('nesShort', 4000, 0.01, 0.8, undefined, 1.6), lvl: 0.239, pan: 0.15 },
+    o: { fn: hat('nesLong', 5000, 0.06, 0.8, undefined, 0.9), lvl: 0.19, pan: 0.15 },
     r: { fn: hat('nesShort', 3000, 0.12, 0.7, undefined, 1.1), lvl: 0.08, pan: 0.25 },
     p: {
       fn: h => {
@@ -440,9 +440,15 @@ const KITS: Record<KitId, Kit> = {
     t: { fn: h => body(h, { f0: 180, f1: 70, pTau: 0.05, decay: 0.12, lvl: 1, type: 'triangle' }), lvl: 0.5, pan: -0.2 },
     m: { fn: h => body(h, { f0: 260, f1: 100, pTau: 0.05, decay: 0.1, lvl: 1, type: 'triangle' }), lvl: 0.46 },
     T: { fn: h => body(h, { f0: 360, f1: 140, pTau: 0.05, decay: 0.09, lvl: 1, type: 'triangle' }), lvl: 0.42, pan: 0.2 },
-    x: { fn: h => noiseHit(h, { buf: h.v.res.nesLong, rate: 0.8, filters: [['highpass', 1500, 0.7], ['lowpass', 10000, 0.5]], decay: 0.3, lvl: 1 }), lvl: 0.16 },
+    x: { fn: h => noiseHit(h, { buf: h.v.res.nesLong, rate: 0.8, filters: [['highpass', 1500, 0.7], ['lowpass', 10000, 0.5]], decay: 0.3, lvl: 0.631 }), lvl: 0.16 },
     z: { fn: (h, _v, len) => riser(h, len, { buf: h.v.res.nesLong, from: 600, to: 8000, q: 1.2, lvl: 0.7, rate: 0.5 }), lvl: 0.2 },
   },
+}
+
+/** Per-kit loudness (linear), calibrated so each kit's groove sits at about -24 LUFS through the drums layer. */
+const KIT_GAIN: Record<KitId, number> = {
+  'kit.synthwave': 0.266, 'kit.soft': 0.209, 'kit.tribal': 0.199, 'kit.brush': 0.224,
+  'kit.motorik': 0.316, 'kit.heartbeat': 0.178, 'kit.chip': 0.295,
 }
 
 export const KIT_IDS = Object.keys(KITS) as KitId[]
@@ -450,10 +456,11 @@ export const HITS: DrumHit[] = ['k', 's', 'c', 'h', 'o', 'r', 'p', 't', 'm', 'T'
 
 /** Play one drum hit. `len` (seconds) is only used by the riser 'z'. */
 export function playDrum(v: VoiceCtx, kit: KitId, hit: DrumHit, at: number, vel: number, len = 1): void {
-  const k = (KITS[kit] ?? KITS['kit.synthwave'])[hit]
+  const id = KITS[kit] ? kit : 'kit.synthwave'
+  const k = KITS[id][hit]
   if (!k || !Number.isFinite(at) || !(vel > 0)) return
   const vv = clamp(vel, 0, 1)
-  const h = open(v, at, k.lvl * vv * (0.4 + 0.6 * vv), k.pan ?? 0, k.gated ?? 0)
+  const h = open(v, at, KIT_GAIN[id] * k.lvl * vv * (0.4 + 0.6 * vv), k.pan ?? 0, k.gated ?? 0)
   k.fn(h, vv, len)
   close(h)
 }

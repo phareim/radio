@@ -334,8 +334,8 @@ export function createConductor(opts: ConductorOptions): Conductor {
     settleUntil = bar + 2
     // Keep what the new place starts with; everything else builds from here.
     const keep = new Set<Layer>(['ambience', 'pad'])
-    if (L.drone && L.layers[controls.intensity].includes('drone')) keep.add('drone')
-    if (L.layers[Math.min(1, controls.intensity)].includes('bass') && present.has('bass')) keep.add('bass')
+    if (L.drone && L.layers[controls.intensity]?.includes('drone')) keep.add('drone')
+    if (L.layers[Math.min(1, controls.intensity)]?.includes('bass') && present.has('bass')) keep.add('bass')
     present = new Set([...present].filter(l => keep.has(l)))
     if (!present.has('pad')) present.add('pad')
     freshTheme(true)

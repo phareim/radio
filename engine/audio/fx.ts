@@ -20,15 +20,23 @@ export interface Fx {
   delayIn: GainNode
   gatedIn: GainNode
   output: AudioNode
+  /** The mix just before the limiter (for level checks). */
+  probe: AudioNode
   /** Glide to a bar's fx state starting at `t0`; `bar` is the bar length (s). */
   apply(s: FxState, t0: number, bar: number, bpm: number): void
 }
 
 /** Master trim before the limiter; calibrated so a full mix peaks near -3 dBFS. */
-const TRIM = 0.8
-/** Reverb and delay return levels at fx.reverb / fx.delay = 1. */
-const REVERB_RETURN = 0.9
-const DELAY_RETURN = 0.55
+const TRIM = 1.0
+/**
+ * Reverb and delay returns. Chrome normalises a convolver's impulse to a fixed
+ * power per sample, so its output grows with tail length; `sizeComp` keeps the
+ * wet energy level as the room grows. At the usual sends (fx.reverb ≈ 0.35)
+ * the reverb sits about 10 dB under a lead, the first echo about 12 dB under.
+ */
+const REVERB_RETURN = 2.8
+const DELAY_RETURN = 1.4
+const sizeComp = (size: number) => Math.sqrt(2.5 / size)
 
 // ---- impulse responses ------------------------------------------------------------
 
@@ -83,7 +91,7 @@ function gatedImpulse(ac: BaseAudioContext): AudioBuffer {
 }
 
 /** Tape curve: normalised tanh over the shaper's input range. */
-function tapeCurve(): Float32Array {
+function tapeCurve() {
   const n = 4096
   const c = new Float32Array(n)
   const k = 3
@@ -97,7 +105,7 @@ function tapeCurve(): Float32Array {
 }
 
 /** Soft clip: linear to 0.8, then eases to a 0.98 ceiling. The last line of defence. */
-function softClipCurve(): Float32Array {
+function softClipCurve() {
   const n = 4096
   const c = new Float32Array(n)
   for (let i = 0; i < n; i++) {
@@ -210,7 +218,7 @@ export function createFx(ac: BaseAudioContext): Fx {
   const makeVerb = (size: number, level: number): Verb => {
     const conv = ac.createConvolver()
     conv.buffer = hallImpulse(ac, size)
-    const send = g(level)
+    const send = g(level * sizeComp(size))
     revLp.connect(send)
     send.connect(conv)
     conv.connect(revOut)
@@ -294,11 +302,11 @@ export function createFx(ac: BaseAudioContext): Fx {
         try { retiring.send.disconnect(); retiring.conv.disconnect() } catch { /* gone */ }
       }
       const old = verb
-      old.send.gain.setValueAtTime(1, t0)
+      old.send.gain.setValueAtTime(sizeComp(old.size), t0)
       old.send.gain.linearRampToValueAtTime(0, t0 + bar)
       verb = makeVerb(size, 0)
       verb.send.gain.setValueAtTime(0, t0)
-      verb.send.gain.linearRampToValueAtTime(1, t0 + bar)
+      verb.send.gain.linearRampToValueAtTime(sizeComp(size), t0 + bar)
       retiring = old
       // Free the old convolver once its tail has rung out.
       const ms = Math.max(0, (t0 + bar + old.size + 0.5 - ac.currentTime) * 1000)
@@ -312,7 +320,7 @@ export function createFx(ac: BaseAudioContext): Fx {
     first = false
   }
 
-  return { input, reverbIn, delayIn, gatedIn, output, apply }
+  return { input, reverbIn, delayIn, gatedIn, output, probe: trim, apply }
 }
 
 function hissBuffer(ac: BaseAudioContext): AudioBuffer {

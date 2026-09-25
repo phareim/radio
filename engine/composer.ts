@@ -289,7 +289,7 @@ function bass(ctx: BarContext, out: NoteEvent[]): void {
 
 function arpRate(ctx: BarContext): number {
   const spec = ctx.L.arp!
-  let rate: number = spec.rate[levelFor(ctx, 'arp', spec.rate, () => false)]
+  let rate: number = spec.rate[levelFor(ctx, 'arp', spec.rate, () => false)] ?? 8
   if (ctx.density > 0.78 && rate < 16) rate *= 2
   if (ctx.density < 0.22 && rate > 4) rate /= 2
   return rate

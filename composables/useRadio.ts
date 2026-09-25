@@ -306,5 +306,6 @@ export function useRadio() {
     setComposed,
     stream: () => player?.stream ?? null,
     context: () => player?.context ?? null,
+    setOutput: (mode: 'speakers' | 'stream') => player?.setOutput(mode),
   }
 }

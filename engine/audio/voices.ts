@@ -27,15 +27,15 @@ type Patch = (v: VoiceCtx, midi: number, at: number, dur: number, vel: number, o
 
 /** Per-voice loudness trim (linear). Calibrated from the harness level table. */
 const LEVEL: Record<VoiceId, number> = {
-  'lead.square': 0.2, 'lead.saw': 0.22, 'lead.pulse': 0.2, 'lead.ep': 0.32, 'lead.hollow': 0.34,
-  'lead.fm': 0.28, 'lead.glide': 0.22, 'lead.whistle': 0.3,
-  'mallet.kalimba': 0.42, 'mallet.marimba': 0.4, 'pluck.harp': 0.3,
-  'arp.square': 0.16, 'arp.pluck': 0.26, 'arp.warm': 0.24, 'arp.glass': 0.3, 'arp.seq': 0.26,
-  'pad.saw': 0.13, 'pad.strings': 0.12, 'pad.choir': 0.5, 'pad.glass': 0.16, 'pad.warm': 0.2, 'pad.dark': 0.18,
-  'bass.saw': 0.3, 'bass.square': 0.26, 'bass.round': 0.4, 'bass.sub': 0.5, 'bass.pluck': 0.3, 'bass.fm': 0.36,
-  'bell.glass': 0.3, 'bell.fm': 0.3, 'bell.chime': 0.26,
-  'counter.strings': 0.18, 'counter.soft': 0.2,
-  'drone.sub': 0.4, 'drone.organ': 0.16, 'drone.shimmer': 0.12,
+  'lead.square': 0.0935, 'lead.saw': 0.0817, 'lead.pulse': 0.176, 'lead.ep': 0.119, 'lead.hollow': 0.0874,
+  'lead.fm': 0.104, 'lead.glide': 0.0772, 'lead.whistle': 0.0865,
+  'mallet.kalimba': 0.117, 'mallet.marimba': 0.125, 'pluck.harp': 0.0817,
+  'arp.square': 0.113, 'arp.pluck': 0.148, 'arp.warm': 0.138, 'arp.glass': 0.149, 'arp.seq': 0.122,
+  'pad.saw': 0.0698, 'pad.strings': 0.0699, 'pad.choir': 0.242, 'pad.glass': 0.0524, 'pad.warm': 0.059, 'pad.dark': 0.0742,
+  'bass.saw': 0.0836, 'bass.square': 0.0624, 'bass.round': 0.0875, 'bass.sub': 0.0629, 'bass.pluck': 0.0826, 'bass.fm': 0.0864,
+  'bell.glass': 0.121, 'bell.fm': 0.108, 'bell.chime': 0.176,
+  'counter.strings': 0.15, 'counter.soft': 0.107,
+  'drone.sub': 0.0627, 'drone.organ': 0.0456, 'drone.shimmer': 0.0342,
 }
 
 // ---- helpers -----------------------------------------------------------------

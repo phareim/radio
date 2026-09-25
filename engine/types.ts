@@ -501,6 +501,12 @@ export interface RadioPlayer {
    * playing with the screen locked and gives the OS media controls a source.
    */
   readonly stream: MediaStream | null
+  /**
+   * Where the sound goes. 'speakers' (default): the AudioContext's own
+   * output. 'stream': only `stream` carries it (the page plays it through an
+   * <audio> element), so the music is not heard twice.
+   */
+  setOutput(mode: 'speakers' | 'stream'): void
 }
 
 // ---- feedback (backend) --------------------------------------------------
