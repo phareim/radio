@@ -11,7 +11,7 @@ import { launch } from './cdp.mjs'
 const dir = join(dirname(fileURLToPath(import.meta.url)), '..')
 const out = join(dir, 'shots')
 mkdirSync(out, { recursive: true })
-const ALL = ['coast', 'summit', 'jungle', 'frostwood', 'village', 'nightdrive', 'voyager', 'deepspace', 'neonrain', 'caverns', 'crossroads-cafe-5b44']
+const ALL = ['coast', 'summit', 'jungle', 'frostwood', 'village', 'nightdrive', 'voyager', 'deepspace', 'neonrain', 'caverns', 'crossroads-cafe-5b44', 'autumn-harbour-4ce5']
 const ids = process.argv[2] && process.argv[2] !== 'all' ? process.argv[2].split(',') : ALL
 const which = process.argv[3] ?? 'both'
 const intensity = Number(process.argv[4] ?? 2)
