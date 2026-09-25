@@ -36,8 +36,8 @@ function validatorPart() {
   return src ? [`## The validator (engine/validate.ts): your JSON must pass it\n\n\`\`\`ts\n${src}\n\`\`\``] : [];
 }
 
-export function buildComposePrompt({ prompt, base, LANDSCAPES }) {
-  const sceneIds = Object.keys(LANDSCAPES);
+export function buildComposePrompt({ prompt, base, LANDSCAPES, SCENES = Object.keys(LANDSCAPES) }) {
+  const sceneIds = SCENES;
   const examples = pickExamples(LANDSCAPES, base);
   const parts = [
     'You are composing a new landscape for a generative radio: one JSON object that the engine plays.',
@@ -54,19 +54,19 @@ export function buildComposePrompt({ prompt, base, LANDSCAPES }) {
     );
   }
   parts.push(
-    `## Scene\n\n\`scene\` must be one of these built-in scene ids (pick the painted place closest to the mood): ${sceneIds.map((s) => `\`${s}\``).join(', ')}.`,
+    `## Scene\n\n\`scene\` must be one of these painted scene ids (pick the place closest to the mood; a new channel may get its own painting later): ${sceneIds.map((s) => `\`${s}\``).join(', ')}.`,
     `## Petter's request\n\n${prompt}`,
     `## Output\n\nReply with ONE JSON object, the complete Landscape, and nothing else: no prose, no code fence. Use only the voice, kit, ambience, mode and layer names from the schema. Give it a short evocative \`name\` (at most 24 characters), a one-line \`blurb\`, and an \`accent\` hex colour. Leave \`id\`, \`origin\` and \`prompt\` out; they are set for you.`,
   );
   return parts.join('\n\n');
 }
 
-export function buildRepairPrompt({ json, errors, LANDSCAPES }) {
+export function buildRepairPrompt({ json, errors, LANDSCAPES, SCENES = Object.keys(LANDSCAPES) }) {
   return [
     'You composed this landscape JSON for a generative radio engine, but the validator rejected it.',
     `## The schema (TypeScript, from engine/types.ts)\n\n\`\`\`ts\n${landscapeSchema()}\n\`\`\``,
     ...validatorPart(),
-    `## Valid scene ids\n\n${Object.keys(LANDSCAPES).join(', ')}`,
+    `## Valid scene ids\n\n${SCENES.join(', ')}`,
     `## Your JSON\n\n\`\`\`json\n${json}\n\`\`\``,
     `## Validator errors\n\n${errors.map((e) => `- ${e}`).join('\n')}`,
     '## Output\n\nFix every error and change nothing else. Reply with the corrected JSON object only: no prose, no code fence.',
@@ -104,7 +104,7 @@ function freshId(db, name, LANDSCAPES) {
 }
 
 /** Parse, stamp and validate one reply. Returns { ok, errors, landscape, json }. */
-function check(reply, { db, prompt, id, validateLandscape, LANDSCAPES }) {
+function check(reply, { db, prompt, id, validateLandscape, LANDSCAPES, SCENES }) {
   let obj;
   try {
     obj = parseJsonObject(reply);
@@ -118,9 +118,9 @@ function check(reply, { db, prompt, id, validateLandscape, LANDSCAPES }) {
   const json = JSON.stringify(stamped, null, 1);
   const res = validateLandscape(stamped);
   const errors = [...(res.errors ?? [])];
-  const scenes = Object.keys(LANDSCAPES);
+  const scenes = SCENES;
   if (!scenes.includes(stamped.scene) && !errors.some((e) => e.startsWith('scene'))) {
-    errors.push(`scene must be one of the built-in ids (${scenes.join(', ')}); got ${JSON.stringify(stamped.scene)}`);
+    errors.push(`scene must be one of the painted scene ids (${scenes.join(', ')}); got ${JSON.stringify(stamped.scene)}`);
   }
   const ok = res.ok && errors.length === 0;
   const landscape = ok ? { ...(res.landscape ?? stamped), id: stamped.id, origin: 'opus', prompt } : undefined;
@@ -132,16 +132,16 @@ function check(reply, { db, prompt, id, validateLandscape, LANDSCAPES }) {
  * errors if the repaired landscape is still invalid.
  */
 export async function composeLandscape({ db, prompt, base, owner = null, ask = askOpus }) {
-  const { validateLandscape, LANDSCAPES } = await loadEngine();
+  const { validateLandscape, LANDSCAPES, SCENES } = await loadEngine();
   if (base && !LANDSCAPES[base]) throw new Error(`unknown base landscape ${base}`);
-  const ctx = { db, prompt, validateLandscape, LANDSCAPES };
+  const ctx = { db, prompt, validateLandscape, LANDSCAPES, SCENES };
 
-  const first = await ask(buildComposePrompt({ prompt, base, LANDSCAPES }));
+  const first = await ask(buildComposePrompt({ prompt, base, LANDSCAPES, SCENES }));
   let res = check(first, ctx);
   let repaired = false;
   if (!res.ok) {
     console.log(`[radio-api] compose: ${res.errors.length} validation errors, asking for a repair`);
-    const second = await ask(buildRepairPrompt({ json: res.json, errors: res.errors, LANDSCAPES }));
+    const second = await ask(buildRepairPrompt({ json: res.json, errors: res.errors, LANDSCAPES, SCENES }));
     res = check(second, { ...ctx, id: res.id });
     repaired = true;
   }

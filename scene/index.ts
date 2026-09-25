@@ -25,6 +25,7 @@ import { createVoyager } from './scenes/voyager.ts'
 import { createDeepspace } from './scenes/deepspace.ts'
 import { createNeonrain } from './scenes/neonrain.ts'
 import { createCaverns } from './scenes/caverns.ts'
+import { createCrossroadsCafe } from './scenes/crossroads-cafe-5b44.ts'
 
 export interface Scene {
   resize(cssW: number, cssH: number, dpr: number): void
@@ -44,6 +45,7 @@ const FACTORIES: Record<string, () => Place> = {
   deepspace: createDeepspace,
   neonrain: createNeonrain,
   caverns: createCaverns,
+  'crossroads-cafe-5b44': createCrossroadsCafe,
 }
 
 export const SCENE_IDS: readonly string[] = Object.keys(FACTORIES)

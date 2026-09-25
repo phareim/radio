@@ -17,3 +17,16 @@ lives in `engine/landscapes/<id>.ts`; the scene in `scene/scenes/<id>.ts`.
 | `caverns` | Crystal Caverns | under the shrine: a cave with glowing crystals, dripping water, an underground lake reflecting the glow | D harmonic minor → phrygian, 90 bpm. Pulse lead, harp plucks, chip drums, dark pad. Drips (stream), shimmer |
 
 Intensity names, 0–4: STILL, DRIFT, CRUISE, DRIVE, SURGE.
+
+## Scenes for composed channels
+
+A composed channel's music lives in the backend's database; at first it
+borrows the painted scene closest to its mood (`scene` in its JSON). It can
+get its own painting in `scene/scenes/<landscape id>.ts`, registered in
+`scene/index.ts` and `SCENE_IDS` in `engine/catalog.ts`; then its `scene`
+points at its own id. `backend/paint.mjs` does this with a Claude Code
+agent (see `backend/README.md`).
+
+| Scene id | Channel | Scene |
+|---|---|---|
+| `crossroads-cafe-5b44` | Crossroads Cafe | old town meets new: stone townhouses with stepped gables and a clock tower on the left, a glass tower with a lobby and a layer-meter screen on the right, the café between (CROSSROADS board, striped awning, espresso machine, a guest outside). A traffic light cycles; trams, pod cars and bikes stop for it; someone crosses on red. Lead and counter notes light old windows, arp and bells tower panes; the kick puffs the machine's steam |

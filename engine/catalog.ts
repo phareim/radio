@@ -46,9 +46,10 @@ const LAYER_SET: Record<Layer, true> = {
 }
 export const LAYER_IDS = Object.keys(LAYER_SET) as Layer[]
 
-/** The painted scenes (one per built-in landscape). */
+/** The painted scenes: one per built-in landscape, and one per composed channel that has been painted (named after its landscape id). */
 export const SCENE_IDS = [
   'coast', 'summit', 'jungle', 'frostwood', 'village', 'nightdrive', 'voyager', 'deepspace', 'neonrain', 'caverns',
+  'crossroads-cafe-5b44',
 ] as const
 
 export const INTENSITY_NAMES = ['STILL', 'DRIFT', 'CRUISE', 'DRIVE', 'SURGE'] as const

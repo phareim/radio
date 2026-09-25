@@ -13,13 +13,20 @@ export function engineDir() {
 
 let cached = null;
 
-/** { validateLandscape, LANDSCAPES, dir } — loaded once per process. */
+/**
+ * { validateLandscape, LANDSCAPES, SCENES, dir } — loaded once per process.
+ * SCENES is every painted scene (catalog.ts), which includes those painted
+ * for composed channels; without a catalog it is the built-in ids.
+ */
 export async function loadEngine() {
   if (cached) return cached;
   const dir = engineDir();
   const validate = await import(pathToFileURL(join(dir, 'validate.ts')).href);
   const index = await import(pathToFileURL(join(dir, 'landscapes', 'index.ts')).href);
-  cached = { validateLandscape: validate.validateLandscape, LANDSCAPES: index.LANDSCAPES, dir };
+  const catalogFile = join(dir, 'catalog.ts');
+  const catalog = existsSync(catalogFile) ? await import(pathToFileURL(catalogFile).href) : {};
+  const SCENES = [...(catalog.SCENE_IDS ?? Object.keys(index.LANDSCAPES))];
+  cached = { validateLandscape: validate.validateLandscape, LANDSCAPES: index.LANDSCAPES, SCENES, dir };
   return cached;
 }
 
