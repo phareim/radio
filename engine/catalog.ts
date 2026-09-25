@@ -54,4 +54,4 @@ export const SCENE_IDS = [
 export const INTENSITY_NAMES = ['STILL', 'DRIFT', 'CRUISE', 'DRIVE', 'SURGE'] as const
 
 /** Bumped when the composer or conductor changes in a way feedback should know about. */
-export const ENGINE_VERSION = '1.0.0'
+export const ENGINE_VERSION = '1.0.1'

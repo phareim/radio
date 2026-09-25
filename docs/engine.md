@@ -33,8 +33,8 @@ where a musician would put them:
 
 | Control | When it lands |
 |---|---|
-| intensity up | layers enter one at a time, from the next half-phrase boundary, 2 bars apart: drone/pad → bass → perc → drums (with a pickup fill) → arp → lead → counter |
-| intensity down | the current phrase finishes; drums play out with a closing fill; layers leave at the phrase boundary |
+| intensity up | layers enter one at a time, from the next half-phrase boundary, 2 bars apart: drone/pad → bass → perc → drums (on a half-phrase, with a pickup fill) → arp → bells → counter → lead (on a phrase start); the patterns (bass line, groove, arp rate) climb one level per entry or half-phrase |
+| intensity down | the current phrase finishes as it is; drums play out with a closing fill; layers leave and patterns drop at the phrase boundary |
 | landscape | the current progression runs to its cadence, the lead drops out, then a 4-bar bridge pivots the harmony (common chord, else the new key's dominant) while tempo, fx and ambience glide; the new landscape arrives with pad and drone, then builds up layer by layer to the target intensity |
 | mood | the mode changes when the next progression starts |
 | density | next phrase |
