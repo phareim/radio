@@ -42,10 +42,10 @@ scripts/make-icons.py      favicon, apple-touch and manifest icons (Pillow)
   intensity, H hold, + / − thumbs, N note, M mute. Ignored while typing.
 - Feedback: ▲ / ▼ save at once with a full `FeedbackSnapshot`; the comment
   box PATCHes words onto it. Failed saves wait in `radio.outbox`.
-- Audio output: where the AudioContext can be silenced (`setSinkId({type:
-  'none'})`, Chromium), the master stream plays through a hidden `<audio>`
-  element so the OS treats the page as media. Elsewhere the context plays
-  straight to the speakers.
+- Audio output: the master stream plays through a hidden `<audio>` element
+  so the OS treats the page as media (lock screen, media keys, background
+  playback on iOS); once the element plays, `player.setOutput('stream')`
+  turns off the direct speaker output so the music is not doubled.
 
 ## Run and deploy
 
