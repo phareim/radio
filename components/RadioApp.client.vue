@@ -124,7 +124,9 @@
  * and the hidden <audio> element; the parts own their own drawing.
  */
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import type { Controls } from '~/engine/types.ts'
+import type { BarPlan, Controls } from '~/engine/types.ts'
+import { modeFor } from '~/engine/conductor.ts'
+import { coverURL } from '~/scene/cover.ts'
 import { load, save } from '~/composables/storage'
 
 const radio = useRadio()
@@ -215,18 +217,49 @@ function setSessionState(): void {
   navigator.mediaSession.playbackState = playing.value ? 'playing' : 'paused'
 }
 
+/**
+ * Title, album and cover for the lock screen, from the bar sounding (or the
+ * chosen place before the first bar). The cover is the place's scene in the
+ * bar's mood. Bars keep coming while the screen is locked, when the HUD and
+ * its watchers stand still, so the bars drive this.
+ */
+let sessionBar: BarPlan | null = null
+let shown = ''
+
 function setMetadata(): void {
   if (!('mediaSession' in navigator) || typeof MediaMetadata === 'undefined') return
-  const L = landscapeOf(hud.landscape)
+  const bar = sessionBar
+  const L = landscapeOf(bar?.meta.landscape ?? hud.landscape)
+  const mood = {
+    landscape: L.id,
+    mode: bar?.key.mode ?? modeFor(L, controls.mood),
+    intensity: Math.round(bar?.meta.intensity ?? controls.intensity),
+    tonic: bar?.key.tonic ?? L.tonic,
+  }
+  const album = radio.intensityNames[controls.intensity]
+  // No cover before the first PLAY: the lock screen has nothing to show until then.
+  const live = radio.started.value
+  const key = [live, L.name, album, mood.landscape, mood.mode, mood.intensity, mood.tonic].join('|')
+  if (key === shown) return
+  shown = key
+  const cover = live ? coverURL(mood) : ''
   navigator.mediaSession.metadata = new MediaMetadata({
     title: L.name,
     artist: 'radio.phareim.no',
-    album: radio.intensityNames[controls.intensity],
+    album,
     artwork: [
+      ...(cover ? [{ src: cover, sizes: '512x512', type: 'image/png' }] : []),
       { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
       { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
     ],
   })
+}
+
+// Off the bar callback, so painting a cover never holds up the audio scheduler.
+let metaTimer: ReturnType<typeof setTimeout> | null = null
+function onSessionBar(bar: BarPlan): void {
+  sessionBar = bar
+  if (!metaTimer) metaTimer = setTimeout(() => { metaTimer = null; setMetadata() }, 0)
 }
 
 function stepPlace(d: number): void {
@@ -247,7 +280,7 @@ function wireMediaSession(): void {
   setMetadata()
 }
 
-watch(() => [hud.landscape, controls.intensity, landscapes.value.length], setMetadata)
+watch(() => [hud.landscape, controls.intensity, controls.mood, landscapes.value.length], setMetadata)
 
 // ---- keyboard ------------------------------------------------------------------
 
@@ -296,6 +329,7 @@ function onKey(e: KeyboardEvent): void {
 // ---- layout --------------------------------------------------------------------
 
 let mq: MediaQueryList | null = null
+let offBar: (() => void) | null = null
 const onMq = () => { narrow.value = !!mq?.matches }
 
 onMounted(() => {
@@ -305,6 +339,7 @@ onMounted(() => {
   mq.addEventListener('change', onMq)
   window.addEventListener('keydown', onKey)
   wireMediaSession()
+  offBar = radio.onBar(onSessionBar)
   calm.value = load<boolean>(CALM_KEY, false) === true
   if (calm.value) wake()
   void refresh()
@@ -317,6 +352,8 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  offBar?.()
+  if (metaTimer) clearTimeout(metaTimer)
   mq?.removeEventListener('change', onMq)
   window.removeEventListener('keydown', onKey)
   if (idleTimer) clearTimeout(idleTimer)

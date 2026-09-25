@@ -62,6 +62,10 @@ scripts/make-icons.py      favicon, apple-touch and manifest icons (Pillow)
   so the OS treats the page as media (lock screen, media keys, background
   playback on iOS); once the element plays, `player.setOutput('stream')`
   turns off the direct speaker output so the music is not doubled.
+- Lock screen: the media session shows the place's name, the intensity and
+  a cover painted from the place's scene in the sounding bar's mood
+  (`scene/cover.ts`, 512² JPEG, cached). The player's bars drive it, since
+  the HUD stands still while the screen is locked.
 
 ## Run and deploy
 

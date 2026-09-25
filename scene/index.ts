@@ -111,7 +111,9 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
 
   /** Update the shared frame context from the player's state. */
   function update(v: VisualState, now: number) {
-    const dt = last < 0 ? 1 / 60 : clamp((now - last) / 1000, 0, 0.1)
+    // The first frame takes the music's mood at once; after that it eases.
+    const first = last < 0
+    const dt = first ? 1 / 60 : clamp((now - last) / 1000, 0, 0.1)
     last = now
     ctx.dt = dt
     ctx.t += dt
@@ -119,15 +121,15 @@ export function createScene(canvas: HTMLCanvasElement): Scene {
     ctx.levels = v.levels ?? EMPTY_LEVELS
     const bar = v.bar
     const target = bar ? clamp(bar.meta.intensity, 0, 4) : 1
-    ctx.intensity += (target - ctx.intensity) * (1 - Math.exp(-dt / 2.5))
+    ctx.intensity += (target - ctx.intensity) * (first ? 1 : 1 - Math.exp(-dt / 2.5))
     ctx.energy = ctx.intensity / 4
     const dark = bar ? DARK[bar.key.mode] ?? 0.5 : 0.4
-    ctx.dark += (dark - ctx.dark) * (1 - Math.exp(-dt / 3))
+    ctx.dark += (dark - ctx.dark) * (first ? 1 : 1 - Math.exp(-dt / 3))
     if (bar && bar.chords.length) {
       const span = bar.chords.find(s => v.step >= s.from && v.step < s.from + s.len) ?? bar.chords[0]!
       const root = Number.isFinite(span.chord.root) ? span.chord.root : 0
       const want = rgb(ROOT_COLORS[((Math.round(root) % 12) + 12) % 12]!)
-      const k = 1 - Math.exp(-dt / 1.2)
+      const k = first ? 1 : 1 - Math.exp(-dt / 1.2)
       accent = [accent[0] + (want[0] - accent[0]) * k, accent[1] + (want[1] - accent[1]) * k, accent[2] + (want[2] - accent[2]) * k]
       ctx.accent = hex(accent)
     }
