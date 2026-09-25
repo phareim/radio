@@ -1,0 +1,27 @@
+{
+  "name": "radio",
+  "version": "1.0.0",
+  "description": "radio.phareim.no: generative, steerable background music in the Neon Shrine pixel look",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nuxt dev --port 3040",
+    "build": "nuxt build",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare",
+    "test": "node --no-warnings --test tests/engine.test.ts && node --no-warnings --test 'backend/test/*.test.mjs'",
+    "icons": "python3 scripts/make-icons.py"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/phareim/radio.git"
+  },
+  "license": "ISC",
+  "dependencies": {
+    "nuxt": "^3.21.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "wrangler": "^4.40.0"
+  }
+}

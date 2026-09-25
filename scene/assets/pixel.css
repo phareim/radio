@@ -1,0 +1,149 @@
+/* Copied from phareim.no themes/base/pixel/pixel.css at commit 80ef19e, with the
+   font-face from themes/base/fonts.css (font file next to this one). */
+@font-face {
+  font-family: "Neon Pixel";
+  src: url("./neon-pixel.woff") format("woff");
+  font-display: block;
+}
+:root {
+  --font-pixel: "Neon Pixel", ui-monospace, monospace;
+}
+
+/**
+ * HTML text for the pixel games (2026-09-24): Neon Shrine's 5×7 letters
+ * (--font-pixel) at whole multiples of the font's 8 px em, with the hard
+ * one-pixel drop shadow the canvas font uses and a soft neon glow behind.
+ *   .px-title  48 px (6 CSS px per font pixel), 64 px from 800 px wide
+ *   .px-hud    16 px, cyan
+ *   .px-hint   16 px, pink — the call to action
+ *   .px-dim    muted, on any of the above
+ * Colours come from --px-hud / --px-hint / --px-title so a game can retint.
+ */
+.px-title,
+.px-hud,
+.px-hint {
+  font-family: var(--font-pixel);
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  line-height: 1.25;
+}
+
+.landing .px-title {
+  font-size: 48px;
+  color: var(--px-title, #ff2fa0);
+  text-shadow: 6px 6px 0 #0b0616, 0 0 24px color-mix(in srgb, var(--px-title, #ff2fa0) 60%, transparent);
+  margin: 0.3em 0 0.2em;
+}
+@media (min-width: 800px) {
+  .landing .px-title { font-size: 64px; text-shadow: 8px 8px 0 #0b0616, 0 0 32px color-mix(in srgb, var(--px-title, #ff2fa0) 60%, transparent); }
+}
+
+/* p.px-* outranks DefaultLanding's `.landing .location` (0.7em), which loads later. */
+.landing .px-hud,
+.landing p.px-hud {
+  font-size: 16px;
+  color: var(--px-hud, #2ff3ff);
+  text-shadow: 2px 2px 0 #0b0616, 0 0 10px color-mix(in srgb, var(--px-hud, #2ff3ff) 55%, transparent);
+  margin: 0.5em 0 0;
+}
+
+.landing .px-hint,
+.landing p.px-hint {
+  font-size: 16px;
+  color: var(--px-hint, #ff2fa0);
+  text-shadow: 2px 2px 0 #0b0616, 0 0 10px color-mix(in srgb, var(--px-hint, #ff2fa0) 50%, transparent);
+  margin: 1em 0 0;
+}
+
+.landing .px-dim {
+  color: var(--px-dim, #b9a8d9);
+  text-shadow: 2px 2px 0 #0b0616;
+  margin-top: 0.5em;
+}
+
+.landing .px-blink {
+  animation: px-blink 1.1s steps(1) infinite;
+}
+@keyframes px-blink {
+  50% { opacity: 0.35; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing .px-blink { animation: none; }
+}
+
+/*
+ * Panels and buttons for pages built from HTML (Hall of Fame, Hangar, the
+ * shell's radio and pills; 2026-09-25). Not scoped to .landing.
+ *   .px-text  the pixel font, no tracking, no smoothing; size in 8 px steps
+ *   .px-box   Neon Shrine's dialog box (themes/zelda/render/hud.ts box())
+ *             at --px-u CSS px per pixel: a one-pixel edge with notched
+ *             corners (four offset shadows, no border-radius) and the faint
+ *             cyan rule inside the top edge. --px-edge retints the edge.
+ *   .px-btn   a small box that lights up on hover and focus
+ */
+.px-text,
+.px-box,
+.px-btn {
+  font-family: var(--font-pixel);
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+}
+
+.px-box {
+  --px-u: 2px;
+  --px-edge: #2ff3ff;
+  position: relative;
+  border: 0;
+  border-radius: 0;
+  background: rgba(11, 6, 22, 0.88);
+  box-shadow:
+    0 calc(-1 * var(--px-u)) 0 0 var(--px-edge),
+    0 var(--px-u) 0 0 var(--px-edge),
+    calc(-1 * var(--px-u)) 0 0 0 var(--px-edge),
+    var(--px-u) 0 0 0 var(--px-edge);
+}
+.px-box::before {
+  content: '';
+  position: absolute;
+  left: calc(var(--px-u) * 2);
+  right: calc(var(--px-u) * 2);
+  top: calc(var(--px-u) * 2);
+  height: var(--px-u);
+  background: rgba(47, 243, 255, 0.35);
+  pointer-events: none;
+}
+.px-box--pink { --px-edge: #ff2fa0; }
+.px-box--gold { --px-edge: #ffd23f; }
+.px-box--flat::before { display: none; }
+
+.px-btn {
+  --px-u: 2px;
+  --px-edge: #2ff3ff;
+  font-size: 16px;
+  line-height: 1;
+  padding: 6px 8px;
+  color: var(--px-edge);
+  background: rgba(11, 6, 22, 0.88);
+  border: 0;
+  border-radius: 0;
+  box-shadow:
+    0 calc(-1 * var(--px-u)) 0 0 var(--px-edge),
+    0 var(--px-u) 0 0 var(--px-edge),
+    calc(-1 * var(--px-u)) 0 0 0 var(--px-edge),
+    var(--px-u) 0 0 0 var(--px-edge);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.px-btn:hover,
+.px-btn:focus-visible {
+  outline: none;
+  color: #0b0616;
+  background: var(--px-edge);
+}
+.px-btn--pink { --px-edge: #ff2fa0; }

@@ -1,0 +1,38 @@
+name: Deploy radio-web
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 22: the tests run the engine's TypeScript with native type stripping.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: node --no-warnings --test tests/engine.test.ts
+
+      - run: node --no-warnings --test 'backend/test/*.test.mjs'
+
+      - run: npm run build
+
+      # The client bundle must not carry internal hostnames or keys.
+      - name: Check the public bundle for leaks
+        run: |
+          if grep -rIl -e 'sleeper.phareim.no' -e 'RADIO_API_KEY' -e 'Bearer ' .output/public; then
+            echo "internal hostname or key in .output/public"; exit 1
+          fi
+
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy

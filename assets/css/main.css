@@ -1,0 +1,101 @@
+/* radio.phareim.no: Neon Shrine's pixel look (phareim.no themes/base/pixel).
+   Dark violet ground, the 5×7 pixel font at 16 px (two CSS px per font
+   pixel), notched .px-box panels, hard one-pixel drop shadows. Cyan is the
+   interface, pink is you (play, thumbs, your notes), gold is Opus. */
+:root {
+  --bg: #0b0616;
+  --bg-2: #140b26;
+  --bg-3: #1c1030;
+  --ink: #f2e9ff;
+  --muted: #b9a8d9;
+  --subtle: #7a6a9a;
+  --edge-dim: #4a3d88;
+  --cyan: #2ff3ff;
+  --pink: #ff2fa0;
+  --gold: #ffd23f;
+  --app-height: 100dvh;
+  /* Nothing interactive sits lower than this above the bottom edge. */
+  --app-safe-bottom: env(safe-area-inset-bottom, 0px);
+  color-scheme: dark;
+}
+
+@supports not (height: 100dvh) {
+  :root { --app-height: 100vh; }
+}
+
+/* Installed as a web app the page reaches the home indicator. */
+@media (display-mode: standalone), (display-mode: fullscreen) {
+  :root { --app-safe-bottom: max(24px, calc(env(safe-area-inset-bottom, 0px) + 12px)); }
+}
+
+/* iOS home-screen app with a black-translucent status bar: 100dvh comes up a status bar short. */
+@supports (-webkit-touch-callout: none) {
+  @media (display-mode: standalone), (display-mode: fullscreen) {
+    :root { --app-height: calc(100dvh + env(safe-area-inset-top, 0px)); }
+  }
+}
+
+html {
+  background: var(--bg);
+}
+
+html,
+body,
+#__nuxt {
+  height: var(--app-height);
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-pixel);
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+::selection {
+  background: var(--pink);
+  color: var(--bg);
+}
+
+.px-btn {
+  line-height: 16px;
+  white-space: nowrap;
+  transition: none;
+}
+.px-btn:active { transform: translate(2px, 2px); }
+.px-btn--gold { --px-edge: #ffd23f; }
+.px-btn--dim { --px-edge: #4a3d88; color: var(--muted); }
+.px-btn[disabled] { opacity: 0.45; cursor: default; }
+.px-btn[disabled]:hover { color: var(--px-edge); background: rgba(11, 6, 22, 0.88); }
+
+/* Touch screens keep :hover after a tap; only keyboard focus fills a button there. */
+@media (hover: none) {
+  .px-btn:hover:not(:focus-visible) { color: var(--px-edge); background: rgba(11, 6, 22, 0.88); }
+  .px-btn--dim:hover:not(:focus-visible) { color: var(--muted); }
+}
+
+.px-blink { animation: px-blink 1.1s steps(1) infinite; }
+@keyframes px-blink { 50% { opacity: 0.3; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .px-blink { animation: none; }
+}

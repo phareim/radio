@@ -1,0 +1,29 @@
+name = "radio-web"
+main = ".output/server/index.mjs"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat_v2"]
+
+# Workers Static Assets: Nitro's cloudflare-module preset serves /_nuxt and
+# public/ through the ASSETS binding (a [site] KV bucket is not read by it).
+[assets]
+directory = ".output/public"
+binding = "ASSETS"
+
+# Reader's database: read-only session validation against the shared
+# "session"/"User" tables. Reader owns the schema; this app never writes.
+[[d1_databases]]
+binding = "DB"
+database_name = "reader-service"
+database_id = "2ccea3e6-cd78-45f5-9395-1094f964b273"
+
+[[routes]]
+pattern = "radio.phareim.no"
+zone_name = "phareim.no"
+custom_domain = true
+
+[vars]
+NUXT_RADIO_API_URL = "https://sleeper.phareim.no/radio"
+NUXT_ALLOWED_USER_EMAILS = "phareim@gmail.com"
+
+# Secret (wrangler secret put): NUXT_RADIO_API_KEY, radio-api's Bearer key
+# (RADIO_API_KEY in backend/.env).
