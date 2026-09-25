@@ -9,8 +9,9 @@ repo root; see `AGENTS.md` for the map.
 ## The web app
 
 Nuxt 3 on a Cloudflare Worker (`radio-web`, custom domain `radio.phareim.no`),
-behind Reader login with the email allowlist (tier 3 in the `phareim-webapps`
-skill). The Worker renders a shell; everything else runs client-side in
+public: anyone can listen. A Reader session on the email allowlist (tier 3
+in the `phareim-webapps` skill) unlocks thumbs, notes and composing, and
+every API route except the public list of composed places is gated. The Worker renders a shell; everything else runs client-side in
 `components/RadioApp.client.vue`.
 
 ```
@@ -39,7 +40,13 @@ scripts/make-icons.py      favicon, apple-touch and manifest icons (Pillow)
   `conductor.setControls` with only the changed fields. Controls and volume
   persist in localStorage.
 - Keys: Space play/pause, 1–9 and 0 places, ← → previous/next place, ↑ ↓
-  intensity, H hold, + / − thumbs, N note, M mute. Ignored while typing.
+  intensity, H hold, A auto, G glide on, D dim, M mute; signed in: + / −
+  thumbs, N note; signed out: L goes to Reader's login. Ignored while typing.
+- DIM (`radio.calm`) hides everything but the picture; AUTO, ▶▶ and SHOW
+  stay in the corner and fade after a few seconds without the pointer.
+- AUTO (`composables/useAuto.ts`) stays 7–11 listening minutes in a place,
+  then glides to another near in tempo and not among the last three; ▶▶
+  glides on at once. Crossing time and paused time don't count.
 - Feedback: ▲ / ▼ save at once with a full `FeedbackSnapshot`; the comment
   box PATCHes words onto it. Failed saves wait in `radio.outbox`.
 - Audio output: the master stream plays through a hidden `<audio>` element

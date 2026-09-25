@@ -2,6 +2,7 @@
   <section ref="box" class="win" :style="{ '--acc': accent }">
     <canvas ref="canvas" class="win__canvas" aria-hidden="true" />
 
+    <template v-if="!quiet">
     <div class="win__hud win__hud--tl">
       <p class="win__name">{{ place.origin === 'opus' ? '◈ ' : '' }}{{ place.name }}</p>
       <p class="win__key"><PxText :text="hud.key" /></p>
@@ -24,6 +25,11 @@
         <PxText class="win__now" :text="hud.chord" /><template v-if="hud.next"><span class="win__arrow"> → </span><PxText class="win__next" :text="hud.next" /></template>
       </p>
       <p v-if="hud.note" class="win__note"><PxText :text="hud.note" /></p>
+    </div>
+    </template>
+
+    <div class="win__corner" :class="{ 'win__corner--quiet': quiet }">
+      <slot name="corner" />
     </div>
 
     <button
@@ -48,6 +54,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { createScene } from '~/scene/index.ts'
 import type { Scene } from '~/scene/index.ts'
 
+defineProps<{ quiet?: boolean }>()
 defineEmits<{ start: [] }>()
 
 const { hud, started, tick, landscapeOf } = useRadio()
@@ -141,7 +148,19 @@ onBeforeUnmount(() => {
 }
 .win__hud--tl { top: calc(12px + env(safe-area-inset-top, 0px)); left: 16px; right: 40%; }
 .win__hud--tr { top: calc(12px + env(safe-area-inset-top, 0px)); right: 16px; text-align: right; }
-.win__hud--bl { bottom: 12px; left: 16px; right: 16px; }
+.win__hud--bl { bottom: 12px; left: 16px; right: 232px; }
+
+/* AUTO, ▶▶ and DIM sit in the bottom-right corner; in the quiet view they are all there is. */
+.win__corner {
+  position: absolute;
+  z-index: 3;
+  right: 16px;
+  bottom: 12px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.win__corner--quiet { bottom: calc(16px + var(--app-safe-bottom, 0px)); right: 20px; }
 
 .win__name {
   font-size: 32px;
@@ -211,6 +230,8 @@ onBeforeUnmount(() => {
   .win__name { font-size: 24px; line-height: 28px; text-shadow: 2px 2px 0 var(--bg), 0 0 14px color-mix(in srgb, var(--acc) 55%, transparent); }
   .win__chord { font-size: 24px; line-height: 28px; text-shadow: 2px 2px 0 var(--bg); }
   .win__hud--tl { right: 34%; }
+  .win__hud--bl { right: 16px; }
+  .win__corner:not(.win__corner--quiet) { bottom: auto; top: calc(62px + env(safe-area-inset-top, 0px)); }
   .win__block { width: 8px; height: 8px; }
   .win__meter { gap: 2px; }
 }

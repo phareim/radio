@@ -307,5 +307,7 @@ export function useRadio() {
     stream: () => player?.stream ?? null,
     context: () => player?.context ?? null,
     setOutput: (mode: 'speakers' | 'stream') => player?.setOutput(mode),
+    /** The place sounding now, read from the player (the HUD stops updating in a hidden tab). */
+    sounding: () => player?.visual().bar?.meta.landscape ?? hud.landscape,
   }
 }

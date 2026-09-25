@@ -1,9 +1,42 @@
 <template>
-  <div class="app" :class="{ 'app--narrow': narrow }">
-    <SceneWindow class="app__win" @start="toggle" />
-    <LayerStrip class="app__strip" />
+  <div
+    class="app"
+    :class="{ 'app--narrow': narrow, 'app--calm': calm, 'app--idle': calm && idle }"
+    @pointermove="wake"
+    @pointerdown="wake"
+  >
+    <SceneWindow class="app__win" :quiet="calm" @start="toggle">
+      <template #corner>
+        <div class="corner" :class="{ gone: calm && idle }">
+          <button
+            v-if="calm"
+            type="button"
+            class="px-btn px-btn--pink corner__btn"
+            :aria-label="playing ? 'Pause' : 'Play'"
+            title="PLAY / PAUSE [SPACE]"
+            @click="toggle"
+          >{{ playing ? '❚❚' : '▶' }}</button>
+          <button
+            type="button"
+            class="px-btn px-btn--gold corner__btn"
+            :class="{ on: auto }"
+            :aria-pressed="auto"
+            :title="auto ? 'AUTO IS ON: A NEW PLACE EVERY FEW MINUTES. PRESS TO STAY HERE [A]' : 'AUTO: DRIFT SLOWLY FROM PLACE TO PLACE [A]'"
+            @click="toggleAuto"
+          >AUTO</button>
+          <button type="button" class="px-btn corner__btn" title="GLIDE ON TO ANOTHER PLACE [G]" aria-label="Glide on to another place" @click="glideOn">▶▶</button>
+          <button
+            type="button"
+            class="px-btn px-btn--dim corner__btn"
+            :title="calm ? 'SHOW THE CONTROLS [D]' : 'JUST THE PICTURE [D]'"
+            @click="setCalm(!calm)"
+          >{{ calm ? 'SHOW' : 'DIM' }}</button>
+        </div>
+      </template>
+    </SceneWindow>
+    <LayerStrip v-show="!calm" class="app__strip" />
 
-    <div class="app__deck">
+    <div v-show="!calm" class="app__deck">
       <div class="deck__transport">
         <button
           type="button"
@@ -13,9 +46,11 @@
           title="PLAY / PAUSE [SPACE]"
           @click="toggle"
         >{{ playing ? '❚❚ PAUSE' : '▶ PLAY' }}</button>
-        <button type="button" class="px-btn deck__thumb" title="I LIKE THIS [+]" aria-label="Thumbs up" @click="rate(1)">▲</button>
-        <button type="button" class="px-btn px-btn--pink deck__thumb" title="NOT THIS [-]" aria-label="Thumbs down" @click="rate(-1)">▼</button>
-        <button type="button" class="px-btn px-btn--dim deck__note" title="A NOTE ON THIS MOMENT" @click="rate(0)">NOTE</button>
+        <template v-if="allowed">
+          <button type="button" class="px-btn deck__thumb" title="I LIKE THIS [+]" aria-label="Thumbs up" @click="rate(1)">▲</button>
+          <button type="button" class="px-btn px-btn--pink deck__thumb" title="NOT THIS [-]" aria-label="Thumbs down" @click="rate(-1)">▼</button>
+          <button type="button" class="px-btn px-btn--dim deck__note" title="A NOTE ON THIS MOMENT [N]" @click="rate(0)">NOTE</button>
+        </template>
         <button
           type="button"
           class="px-btn px-btn--gold deck__hold"
@@ -26,7 +61,7 @@
         >HOLD</button>
       </div>
 
-      <StationDial class="deck__dial" @compose="composeOpen = true" />
+      <StationDial class="deck__dial" :can-compose="allowed" @compose="composeOpen = true" />
 
       <div class="deck__knobs">
         <IntensityBar />
@@ -89,11 +124,33 @@
  */
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { Controls } from '~/engine/types.ts'
+import { load, save } from '~/composables/storage'
 
 const radio = useRadio()
 const { controls, playing, volume, muted, set, setVolume, toggleMute, landscapes, landscapeOf, hud } = radio
 const { rate, toast, say, flush } = useFeedback()
 const { compose, refresh, resume } = usePlaces()
+const { allowed, fetchSession, loginUrl } = useAuth()
+const { auto, toggleAuto, glideOn } = useAuto()
+
+// ---- the quiet view: just the picture, and AUTO / ▶▶ / SHOW in a corner that fades when left alone
+
+const CALM_KEY = 'radio.calm'
+const calm = ref(false)
+const idle = ref(false)
+let idleTimer: ReturnType<typeof setTimeout> | null = null
+
+function wake(): void {
+  idle.value = false
+  if (idleTimer) clearTimeout(idleTimer)
+  idleTimer = setTimeout(() => { idle.value = true }, 3500)
+}
+
+function setCalm(on: boolean): void {
+  calm.value = on
+  save(CALM_KEY, on)
+  wake()
+}
 
 const composeOpen = ref(false)
 const composing = computed(() => compose.value.phase === 'working')
@@ -182,7 +239,7 @@ function wireMediaSession(): void {
   on('play', () => { if (!playing.value) toggle() })
   on('pause', () => { if (playing.value) toggle() })
   on('stop', () => { if (playing.value) toggle() })
-  on('nexttrack', () => stepPlace(1))
+  on('nexttrack', () => (auto.value ? glideOn() : stepPlace(1)))
   on('previoustrack', () => stepPlace(-1))
   setMetadata()
 }
@@ -200,8 +257,10 @@ function onKey(e: KeyboardEvent): void {
   if (e.metaKey || e.ctrlKey || e.altKey || typing(e.target)) return
   if (e.key === 'Escape') {
     if (composeOpen.value) { composeOpen.value = false; e.preventDefault() }
+    else if (calm.value) { setCalm(false); e.preventDefault() }
     return
   }
+  wake()
   if (composeOpen.value) return
   const k = e.key
   let handled = true
@@ -215,10 +274,15 @@ function onKey(e: KeyboardEvent): void {
   else if (k === 'ArrowUp') set({ intensity: Math.min(4, controls.intensity + 1) as Controls['intensity'] })
   else if (k === 'ArrowDown') set({ intensity: Math.max(0, controls.intensity - 1) as Controls['intensity'] })
   else if (k === 'h' || k === 'H') set({ hold: !controls.hold })
-  else if (k === '+' || k === '=' || e.code === 'NumpadAdd') { if (!e.repeat) void rate(1) }
-  else if (k === '-' || k === '_' || e.code === 'NumpadSubtract') { if (!e.repeat) void rate(-1) }
+  else if (k === 'a' || k === 'A') { if (!e.repeat) toggleAuto() }
+  else if (k === 'g' || k === 'G') { if (!e.repeat) glideOn() }
+  else if (k === 'd' || k === 'D') { if (!e.repeat) setCalm(!calm.value) }
   else if (k === 'm' || k === 'M') { if (!e.repeat) toggleMute() }
-  else if (k === 'n' || k === 'N') { if (!e.repeat) void rate(0) }
+  else if (allowed.value && (k === '+' || k === '=' || e.code === 'NumpadAdd')) { if (!e.repeat) void rate(1) }
+  else if (allowed.value && (k === '-' || k === '_' || e.code === 'NumpadSubtract')) { if (!e.repeat) void rate(-1) }
+  else if (allowed.value && (k === 'n' || k === 'N')) { if (!e.repeat) void rate(0) }
+  // A way in for Petter on a new device; visitors never need it.
+  else if (!allowed.value && (k === 'l' || k === 'L')) window.location.href = loginUrl()
   else handled = false
   if (handled) e.preventDefault()
 }
@@ -235,14 +299,20 @@ onMounted(() => {
   mq.addEventListener('change', onMq)
   window.addEventListener('keydown', onKey)
   wireMediaSession()
+  calm.value = load<boolean>(CALM_KEY, false) === true
+  if (calm.value) wake()
   void refresh()
-  resume()
-  void flush()
+  void fetchSession().then((ok) => {
+    if (!ok) return
+    resume()
+    void flush()
+  })
 })
 
 onBeforeUnmount(() => {
   mq?.removeEventListener('change', onMq)
   window.removeEventListener('keydown', onKey)
+  if (idleTimer) clearTimeout(idleTimer)
 })
 </script>
 
@@ -261,6 +331,14 @@ onBeforeUnmount(() => {
 }
 
 .app__win { min-height: 0; }
+
+.app--calm { grid-template-rows: minmax(0, 1fr) 0 0; }
+.app--idle { cursor: none; }
+
+.corner { display: flex; gap: 10px; align-items: center; transition: opacity 0.6s ease; }
+.corner.gone { opacity: 0; pointer-events: none; }
+.corner__btn { height: 32px; padding: 0 10px; }
+.corner__btn.on, .corner__btn.on:hover { color: var(--bg); background: var(--gold); }
 
 .app__deck {
   display: grid;

@@ -14,7 +14,7 @@ export default defineNuxtConfig({
       title: 'Radio',
       htmlAttrs: { lang: 'en' },
       meta: [
-        { name: 'description', content: 'Generative background music you can steer' },
+        { name: 'description', content: 'Generative background music you can steer: ten pixel places, from a neon coast to deep space.' },
         { name: 'viewport', content: 'width=device-width, initial-scale=1, viewport-fit=cover' },
         { name: 'theme-color', content: '#0b0616' },
         { name: 'color-scheme', content: 'dark' },
@@ -22,6 +22,11 @@ export default defineNuxtConfig({
         { name: 'apple-mobile-web-app-capable', content: 'yes' },
         { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' },
         { name: 'apple-mobile-web-app-title', content: 'Radio' },
+        { property: 'og:title', content: 'Radio · phareim.no' },
+        { property: 'og:description', content: 'Generative background music you can steer: ten pixel places, from a neon coast to deep space.' },
+        { property: 'og:image', content: 'https://radio.phareim.no/og.png' },
+        { property: 'og:url', content: 'https://radio.phareim.no/' },
+        { name: 'twitter:card', content: 'summary_large_image' },
       ],
       link: [
         { rel: 'icon', href: '/favicon.ico', sizes: '16x16 32x32 48x48' },

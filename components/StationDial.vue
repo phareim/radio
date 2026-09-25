@@ -11,7 +11,7 @@
     <p class="dial__blurb">
       <span>{{ target.blurb }}</span>
       <button
-        v-if="target.origin === 'opus'"
+        v-if="canCompose && target.origin === 'opus'"
         type="button"
         class="dial__hide"
         @click="hideTarget"
@@ -34,7 +34,7 @@
         <span class="dial__num">{{ L.origin === 'opus' ? '◈' : i < 10 ? (i + 1) % 10 : '' }}</span>
         <span class="dial__name">{{ L.name }}</span>
       </button>
-      <button type="button" class="dial__st dial__new" title="Ask Opus to compose a new place" @click="$emit('compose')">
+      <button v-if="canCompose" type="button" class="dial__st dial__new" title="Ask Opus to compose a new place" @click="$emit('compose')">
         <span class="dial__num">+</span>
         <span class="dial__name">NEW PLACE</span>
       </button>
@@ -50,6 +50,7 @@
  */
 import { computed, ref, watch } from 'vue'
 
+defineProps<{ canCompose?: boolean }>()
 defineEmits<{ compose: [] }>()
 
 const { controls, hud, landscapes, set, landscapeOf } = useRadio()
