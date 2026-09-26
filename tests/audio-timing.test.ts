@@ -3,7 +3,10 @@
 // pianos) and their buffer cache. Run: node --no-warnings --test tests/audio-timing.test.ts
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { barTiming, swingWarp, swingUnwarp, dottedEighth, fadeAtBarStart, fadeAtBarEnd, positionIn, type PlacedBar } from '../engine/audio/timing.ts'
+import {
+  barTiming, swingWarp, swingUnwarp, dottedEighth, fadeAtBarStart, fadeAtBarEnd, positionIn, type PlacedBar,
+  rampAt, pruneRamps, cutBars, keepWhere, quantumAfter, type Ramp,
+} from '../engine/audio/timing.ts'
 import { renderPluck, renderPiano, loopCoefficient } from '../engine/audio/render.ts'
 import { renderInstrument, INSTRUMENTS, type InstrumentId } from '../engine/audio/instruments.ts'
 import { createBufferCache } from '../engine/audio/synth.ts'
@@ -145,6 +148,70 @@ test('positionAt: a gap between bars (a stalled clock) is null, steps stay under
   assert.equal(positionIn(bars, 2.5), null)
   assert.equal(positionIn(bars, 3)!.bar, 1)
   assert.ok(positionIn(bars, 1.9999999)!.step < 16)
+})
+
+// ---- the transport cut -------------------------------------------------------------------
+
+test('cut: bars from `at` go, the bar sounding at `at` ends there, earlier bars stay', () => {
+  const bars = lay(0, [[120, 120, 0], [120, 120, 0], [120, 120, 0], [120, 120, 0]], 10)
+  const gone = cutBars(bars, 3)
+  assert.deepEqual(gone.map(b => b.index), [12, 13])
+  assert.deepEqual(bars.map(b => [b.index, b.t0, b.t1]), [[10, 0, 2], [11, 2, 3]])
+  // Exactly on a barline: that bar goes, the one before keeps its end.
+  const b2 = lay(0, [[120, 120, 0], [120, 120, 0]])
+  assert.deepEqual(cutBars(b2, 2).map(b => b.index), [1])
+  assert.deepEqual(b2.map(b => b.t1), [2])
+  // Before everything, and past everything.
+  const b3 = lay(5, [[120, 120, 0]])
+  assert.equal(cutBars(b3, 1).length, 1)
+  assert.equal(b3.length, 0)
+  const b4 = lay(0, [[120, 120, 0]])
+  assert.equal(cutBars(b4, 9).length, 0)
+  assert.equal(b4[0]!.t1, 2)
+})
+
+test('positionAt after a cut: null from the cut to the next bar, the next bar at its real time', () => {
+  const bars = lay(0, [[120, 120, 0], [120, 120, 0], [120, 120, 0]], 40)
+  cutBars(bars, 2.75)
+  // What sounded before the cut keeps its place.
+  close(positionIn(bars, 2.5)!.step, 4)
+  assert.equal(positionIn(bars, 2.5)!.bar, 41)
+  assert.equal(positionIn(bars, 2.75), null)
+  assert.equal(positionIn(bars, 3.5), null)
+  // The conductor's next bar (a seek: loop bar 0 again, index 43) starts at the cut.
+  bars.push(...lay(2.75, [[90, 90, 0]], 43))
+  assert.deepEqual(positionIn(bars, 2.75), { bar: 43, step: 0 })
+  const p = positionIn(bars, 2.75 + (15 / 90) * 6)!
+  assert.equal(p.bar, 43)
+  close(p.step, 6)
+  close(positionIn(bars, 2.7499)!.step, 5.9992, 1e-3)
+})
+
+test('ramps read back the value at a time: inside, after, before, empty', () => {
+  const r: Ramp[] = [[0, 0, 2, 1], [2, 1, 4, 1], [4, 1, 6, 0.5]]
+  close(rampAt(r, 1), 0.5)
+  close(rampAt(r, 3), 1)
+  close(rampAt(r, 5), 0.75)
+  close(rampAt(r, 9), 0.5)
+  close(rampAt(r, -1), 0)
+  close(rampAt([], 3, 0.7), 0.7)
+  // A jump ramp (0 → 1 in 30 ms) then a hold.
+  close(rampAt([[0, 0, 0.03, 1], [0.03, 1, 2, 1]], 1), 1)
+  pruneRamps(r, 4.5)
+  assert.deepEqual(r, [[4, 1, 6, 0.5]])
+  pruneRamps(r, 99)
+  assert.equal(r.length, 1)
+})
+
+test('keepWhere filters in place; quantumAfter rounds up to a render quantum', () => {
+  const xs = [1, 5, 2, 8, 3]
+  keepWhere(xs, x => x < 4)
+  assert.deepEqual(xs, [1, 2, 3])
+  const q = 128 / 48000
+  close(quantumAfter(0.01, 48000), Math.ceil(0.01 / q) * q)
+  assert.ok(quantumAfter(0.01, 48000) >= 0.01)
+  close(quantumAfter(q * 7, 48000), q * 7)
+  close(quantumAfter(1, 44100) * 44100 % 128, 0, 1e-6)
 })
 
 // ---- rendered instruments -----------------------------------------------------------------

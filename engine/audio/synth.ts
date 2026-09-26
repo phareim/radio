@@ -215,8 +215,82 @@ export interface Note {
   tail: AudioNode
 }
 
-/** Returned by voices; lets the player tie a repeated pad/drone note instead of re-attacking it. */
-export interface NoteHandle {
+/**
+ * A scheduled sound the transport can cut (RadioPlayer.cut): notes, drum hits
+ * and ambience events all return one.
+ */
+export interface Cuttable {
+  /** Audio time it starts sounding. */
+  readonly start: number
+  /** Audio time its sources stop (it is silent from here); moves when it is extended or cut. */
+  readonly gone: number
+  /**
+   * Cut at `at` (clamped to now). Starting at or after `at`: it never sounds.
+   * Sounding at `at`: it fades to silence over `fade` seconds, except that
+   * with `ring` a percussive sound (no held phase) rings out as scheduled.
+   */
+  cut(at: number, fade: number, ring: boolean): void
+}
+
+/**
+ * Freeze an AudioParam's automation at `t`: later events are dropped, the
+ * value at `t` holds. Where cancelAndHoldAtTime is missing (Firefox) events
+ * from `t` on are dropped and false is returned, so a caller that knows the
+ * value can land on it.
+ */
+export function holdAt(p: AudioParam, t: number): boolean {
+  const hold = (p as AudioParam & { cancelAndHoldAtTime?: (t: number) => AudioParam }).cancelAndHoldAtTime
+  if (typeof hold === 'function') { hold.call(p, t); return true }
+  p.cancelScheduledValues(t)
+  return false
+}
+
+/**
+ * A Cuttable for a one-shot sound whose output passes through `gate`, a gain
+ * with no automation of its own (a drum hit's output, an ambience event's
+ * input). The owner adds the sound's sources to `srcs` and
+ * moves `gone` to the time the last one stops.
+ */
+export interface GateHandle extends Cuttable {
+  gone: number
+  srcs: AudioScheduledSourceNode[]
+}
+
+export function gateHandle(ac: BaseAudioContext, gate: GainNode, start: number, percussive: boolean): GateHandle {
+  const h: GateHandle = {
+    start,
+    gone: start,
+    srcs: [],
+    cut(at, fade, ring) {
+      const t = Math.max(Number.isFinite(at) ? at : 0, ac.currentTime)
+      if (t >= h.gone) return
+      if (t <= h.start) {
+        gate.gain.setValueAtTime(0, t)
+        stopAll(h.srcs, h.start)
+        h.gone = h.start
+        return
+      }
+      if (ring && percussive) return
+      const f = Math.max(0.005, Number.isFinite(fade) ? fade : 0.08)
+      const stop = t + Math.max(0.01, f * 1.3)
+      if (stop >= h.gone) return
+      holdAt(gate.gain, t)
+      gate.gain.setTargetAtTime(0, t, f / 5)
+      stopAll(h.srcs, stop)
+      h.gone = stop
+    },
+  }
+  return h
+}
+
+function stopAll(srcs: AudioScheduledSourceNode[], t: number): void {
+  for (const s of srcs) {
+    try { s.stop(t) } catch { /* not started or gone */ }
+  }
+}
+
+/** Returned by voices; lets the player tie a repeated pad/drone note instead of re-attacking it, and cut it. */
+export interface NoteHandle extends Cuttable {
   /** Nominal end (at + dur), before the release. */
   end: number
   /** Move the release to `newEnd`. False if the note cannot be extended (percussive, already releasing). */
@@ -368,9 +442,7 @@ export function finish(n: Note, env: { end: number; relAt: number }, release: nu
       released = true
       const g = n.amp.gain
       // Hold the curve where it is at t (mid-attack or mid-decay), then fall from there.
-      const hold = (g as AudioParam & { cancelAndHoldAtTime?: (t: number) => AudioParam }).cancelAndHoldAtTime
-      if (typeof hold === 'function') hold.call(g, t)
-      else g.cancelScheduledValues(t)
+      holdAt(g, t)
       // Percussive notes (no gate) have a short release of zero: damp them like a quick hand.
       const tau = relAt < 0 ? 0.02 : rel
       g.setTargetAtTime(0, t, tau)
@@ -383,6 +455,40 @@ export function finish(n: Note, env: { end: number; relAt: number }, release: nu
       relAt = t
       end = Math.min(end, stop)
       handle.end = t
+    },
+    start: n.at,
+    get gone() { return end },
+    cut(at: number, fade: number, ring: boolean): void {
+      const t = Math.max(Number.isFinite(at) ? at : 0, n.ac.currentTime)
+      if (t >= end) return
+      const g = n.amp.gain
+      if (t <= n.at) {
+        // Not started: the VCA stays at 0 and the sources stop as they start.
+        g.cancelScheduledValues(t)
+        g.setValueAtTime(0, t)
+        const stop = Math.max(t, n.at)
+        try {
+          for (const s of n.srcs) s.stop(stop)
+        } catch { /* the sources end on their own schedule */ }
+        released = true
+        relAt = t
+        end = stop
+        handle.end = t
+        return
+      }
+      if (ring && relAt < 0) return
+      const f = Math.max(0.005, Number.isFinite(fade) ? fade : 0.08)
+      const stop = t + Math.max(0.01, f * 1.3)
+      if (stop >= end) return
+      holdAt(g, t)
+      g.setTargetAtTime(0, t, f / 5)
+      try {
+        for (const s of n.srcs) s.stop(stop)
+      } catch { /* the sources end on their own schedule */ }
+      released = true
+      relAt = t
+      end = stop
+      handle.end = Math.min(handle.end, t)
     },
   }
   return handle

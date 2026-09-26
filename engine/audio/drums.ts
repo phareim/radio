@@ -10,10 +10,12 @@
  *
  * Every hit is one output gain (level × velocity) into the layer bus, and
  * optionally into the gated reverb. It is disconnected when its longest
- * source ends.
+ * source ends. `playDrum` returns a Cuttable (synth.ts) for the transport
+ * cut: a hit that has not started stays silent; a sounding hit rings out,
+ * except a riser (z), which fades like a held note.
  */
 import type { KitId, DrumHit } from '../types.ts'
-import { type VoiceCtx, clamp, rand, safeHz } from './synth.ts'
+import { type VoiceCtx, type Cuttable, type GateHandle, clamp, rand, safeHz, gateHandle } from './synth.ts'
 
 interface Hit {
   ac: BaseAudioContext
@@ -24,6 +26,8 @@ interface Hit {
   taps: AudioNode[]
   last: AudioScheduledSourceNode | null
   end: number
+  /** Every source, for a transport cut. */
+  srcs: AudioScheduledSourceNode[]
 }
 
 type HitFn = (h: Hit, vel: number, len: number) => void
@@ -50,11 +54,12 @@ function open(v: VoiceCtx, at: number, level: number, pan: number, gated: number
     g.connect(v.out.gate)
     taps.push(g)
   }
-  return { ac, v, at, out, taps, last: null, end: at }
+  return { ac, v, at, out, taps, last: null, end: at, srcs: [] }
 }
 
 function track(h: Hit, src: AudioScheduledSourceNode, end: number): void {
   src.stop(end)
+  h.srcs.push(src)
   if (end >= h.end) { h.end = end; h.last = src }
 }
 
@@ -455,12 +460,16 @@ export const KIT_IDS = Object.keys(KITS) as KitId[]
 export const HITS: DrumHit[] = ['k', 's', 'c', 'h', 'o', 'r', 'p', 't', 'm', 'T', 'x', 'z']
 
 /** Play one drum hit. `len` (seconds) is only used by the riser 'z'. */
-export function playDrum(v: VoiceCtx, kit: KitId, hit: DrumHit, at: number, vel: number, len = 1): void {
+export function playDrum(v: VoiceCtx, kit: KitId, hit: DrumHit, at: number, vel: number, len = 1): Cuttable | null {
   const id = KITS[kit] ? kit : 'kit.synthwave'
   const k = KITS[id][hit]
-  if (!k || !Number.isFinite(at) || !(vel > 0)) return
+  if (!k || !Number.isFinite(at) || !(vel > 0)) return null
   const vv = clamp(vel, 0, 1)
   const h = open(v, at, KIT_GAIN[id] * k.lvl * vv * (0.4 + 0.6 * vv), k.pan ?? 0, k.gated ?? 0)
   k.fn(h, vv, len)
   close(h)
+  const c: GateHandle = gateHandle(v.ac, h.out, at, hit !== 'z')
+  c.srcs = h.srcs
+  c.gone = h.end
+  return c
 }

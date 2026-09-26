@@ -7,7 +7,7 @@
  * pre-limiter peak, DC, NaN, clipped samples, spectral centroid and the
  * share of energy above 5 kHz.
  */
-import type { AmbienceId, ConductorLike, KitId, LiveNote, VoiceId } from '../engine/types.ts'
+import type { AmbienceId, BarPlan, ConductorLike, KitId, LiveNote, VoiceId } from '../engine/types.ts'
 import { createCore } from '../engine/audio/core.ts'
 import { createPlayer } from '../engine/audio/player.ts'
 import { VOICE_IDS } from '../engine/audio/voices.ts'
@@ -33,6 +33,10 @@ interface Case {
   visual?: boolean
   /** Called at every scheduler tick (0.5 s apart) after core.tick: live notes. */
   onTick?: (core: ReturnType<typeof createCore>, t: number, errs: string[]) => void
+  /** Whether a tick plans bars (false: the idle transport). Default true. */
+  plan?: () => boolean
+  /** Windows that must be loud (peak over -40 dBFS) or silent (under -60). */
+  expect?: Array<[label: string, from: number, to: number, want: 'loud' | 'silent']>
 }
 
 export interface Stats {
@@ -62,6 +66,8 @@ export interface Row {
   visualErrors: string[]
   /** Core queue lengths at the end of the render. */
   sizes: Record<string, number>
+  /** Failed `expect` windows and onTick checks that are not about visual(). */
+  checkErrors: string[]
 }
 
 /** Count every create*() call on a context. */
@@ -233,7 +239,7 @@ async function render(c: Case): Promise<Row> {
   for (let t = 0.5; t < c.seconds; t += 0.5) {
     const at = t
     ac.suspend(at).then(() => {
-      core.tick(at, at + 0.7)
+      core.tick(at, at + 0.7, c.plan ? c.plan() : true)
       core.due(at)
       c.onTick?.(core, at, visualErrors)
       if (c.visual) checkVisual(core.visual(at), at, visualErrors)
@@ -243,7 +249,12 @@ async function render(c: Case): Promise<Row> {
   const buf = await ac.startRendering()
   const row: Row = {
     group: c.group, name: c.name, stats: measure(buf, c.from ?? 0, c.seconds), ms: performance.now() - started,
-    nodesPerSec: nodes() / c.seconds, visualErrors, sizes: core.sizes(),
+    nodesPerSec: nodes() / c.seconds, visualErrors, sizes: core.sizes(), checkErrors: [],
+  }
+  for (const [label, a, b, want] of c.expect ?? []) {
+    const pk = measure(buf, a, b).peak
+    if (want === 'loud' && !(pk > -40)) row.checkErrors.push(`${label} (${a}-${b} s) should sound, peak ${pk.toFixed(1)} dBFS`)
+    if (want === 'silent' && !(pk < -60)) row.checkErrors.push(`${label} (${a}-${b} s) should be silent, peak ${pk.toFixed(1)} dBFS`)
   }
   if (c.windows) row.windows = c.windows.map(([label, a, b]) => [label, measure(buf, a, b)])
   if (c.wav) row.wav = wav16(buf, 0)
@@ -275,6 +286,7 @@ function cases(filter: string, wavAll: boolean): Case[] {
     out.push({ group: 'wet', name: `${v}:dry`, seconds: 14, conductor: () => soloVoice(v, { reverb: 0, delay: 0 }) })
     out.push({ group: 'wet', name: `${v}:wet`, seconds: 14, conductor: () => soloVoice(v) })
   }
+  out.push(...transportCases())
   for (const id of Object.keys(LANDSCAPES)) {
     out.push({
       group: 'landscape', name: id, seconds: 50, from: 22, wav: wavAll, visual: true,
@@ -346,10 +358,75 @@ function liveHits(kit: KitId): NonNullable<Case['onTick']> {
   }
 }
 
+/** A conductor with its effects made dry (no reverb, echo or hiss), so a cut shows as silence. */
+function dry(c: ConductorLike): ConductorLike {
+  return { ...c, nextBar: (): BarPlan => { const p = c.nextBar(); return { ...p, fx: { ...p.fx, reverb: 0, delay: 0, grit: 0 } } } }
+}
+
+/**
+ * The transport (jam): STOP at 4 s (cut + idle: notes fade in 80 ms, the
+ * ambience in 0.5 s), a live note while idle, PLAY again (a fresh bar at
+ * once); and a SEEK (cut while playing: the next bar starts at the cut).
+ */
+function transportCases(): Case[] {
+  let idle = false
+  let heldNote: LiveNote | null = null
+  const stop: Case = {
+    group: 'cut', name: 'stop-live-play', seconds: 10, conductor: () => dry(fullMix()), visual: false,
+    plan: () => !idle,
+    expect: [['music', 3, 4, 'loud'], ['after STOP', 4.7, 5.95, 'silent'], ['live note while idle', 6, 6.5, 'loud'], ['after PLAY', 7.6, 10, 'loud']],
+    onTick(core, t, errs) {
+      const err = (m: string) => { if (errs.length < 6) errs.push(`t=${t.toFixed(1)}: ${m}`) }
+      if (t === 4) {
+        idle = true
+        core.cut(4, 0.08, false)
+        core.tick(4, 4.7, false)
+        if (core.positionAt(4.1) !== null) err('positionAt after STOP should be null')
+        if (core.positionAt(3.9) === null) err('positionAt before STOP lost')
+      }
+      if (t === 5) {
+        const v = core.visual(5)
+        if (v.bar !== null) err('visual().bar should be null while idle')
+        if (core.sizes().pending !== 0) err(`pending ${core.sizes().pending} while idle`)
+      }
+      if (t === 6) {
+        heldNote = core.live('lead', { voice: 'keys.piano', midi: 67 }, 0.8)
+      }
+      if (t === 6.5) heldNote?.release()
+      if (t === 7.5) {
+        idle = false
+        core.rearm(7.5)
+        core.tick(7.5, 8.2, true)
+        const p = core.positionAt(7.5)
+        if (!p || p.step > 0.01) err(`PLAY: the next bar should start at once, got ${JSON.stringify(p)}`)
+      }
+    },
+  }
+  let before: { bar: number; step: number } | null = null
+  const seek: Case = {
+    group: 'cut', name: 'seek', seconds: 8, conductor: () => dry(fullMix()), visual: true,
+    expect: [['before', 2.5, 4, 'loud'], ['after SEEK', 4.05, 8, 'loud']],
+    onTick(core, t, errs) {
+      const err = (m: string) => { if (errs.length < 6) errs.push(`t=${t.toFixed(1)}: ${m}`) }
+      if (t === 4) {
+        before = core.positionAt(3.9)
+        core.cut(4, 0.08, true)
+        core.tick(4, 4.7, true)
+        const p = core.positionAt(4)
+        const q = core.positionAt(4.3)
+        if (!before || !p || p.bar <= before.bar + 1 || p.step !== 0) err(`the bar after the cut: before ${JSON.stringify(before)}, at the cut ${JSON.stringify(p)}`)
+        if (!q || !p || q.bar !== p.bar) err('positionAt after the cut should stay in the new bar')
+      }
+      if (t === 4.5 && core.visual(4.5).bar?.index !== core.positionAt(4.5)?.bar) err('visual() and positionAt disagree after the cut')
+    },
+  }
+  return [stop, seek]
+}
+
 declare global {
   interface Window {
     runAudioCheck(filter: string, wavAll: boolean): Promise<Row[]>
-    smokePlayer(): Promise<Record<string, unknown>>
+    smokePlayer(): Promise<Record<string, unknown> & { problems?: string[] }>
   }
 }
 
@@ -395,9 +472,81 @@ window.smokePlayer = async () => {
   await p.start()
   await wait(1500)
   res.afterRestart = { state: p.context?.state, playing: p.playing, bars: bars.length }
+  res.transport = await smokeTransport(p, bars, ctx)
   off()
   p.stop()
+  // A player started idle: the context runs, live notes play, no bar until released.
+  const q = createPlayer(createConductor({ lookup: x => LANDSCAPES[x], seed: 2, controls: { landscape: 'coast', intensity: 3 } }), { latencyHint: 'interactive' })
+  const qBars: number[] = []
+  q.onBar(b => qBars.push(b.index))
+  await q.start({ idle: true })
+  const qNote = q.live('lead', { voice: 'keys.piano', midi: 72 }, 0.8)
+  await wait(800)
+  const idleStart = { state: q.context?.state, playing: q.playing, idle: q.idle, bars: qBars.length, live: !!qNote, bar: q.visual().bar?.index ?? null }
+  qNote?.release()
+  q.setIdle(false)
+  await wait(400)
+  const released = { idle: q.idle, bars: qBars.slice(), bar: q.visual().bar?.index ?? null }
+  q.stop()
+  res.idleStart = { ...idleStart, released }
+  const problems = (res.transport as { problems: string[] }).problems
+  if (idleStart.state !== 'running' || !idleStart.playing || !idleStart.idle) problems.push(`start({ idle: true }): ${JSON.stringify(idleStart)}`)
+  if (idleStart.bars !== 0 || idleStart.bar !== null) problems.push(`start({ idle: true }) planned bars: ${idleStart.bars}`)
+  if (!idleStart.live) problems.push('live() returned null on an idle start')
+  if (released.idle || released.bars.length === 0 || released.bar === null) problems.push(`setIdle(false) after an idle start: ${JSON.stringify(released)}`)
+  res.problems = problems
   return res
+}
+
+/**
+ * jam's transport on the live player: SEEK (cut while playing), STOP (cut +
+ * setIdle(true)), live notes while idle, PLAY (setIdle(false)). Returns what it saw and
+ * the problems.
+ */
+async function smokeTransport(p: ReturnType<typeof createPlayer>, bars: number[], ctx: AudioContext): Promise<Record<string, unknown> & { problems: string[] }> {
+  const wait = (ms: number) => new Promise(r => setTimeout(r, ms))
+  const problems: string[] = []
+  // SEEK: the next bar starts within a render quantum or two of the cut.
+  await wait(700)
+  const n0 = bars.length
+  const last = bars[bars.length - 1] ?? -1
+  const tCut = ctx.currentTime
+  p.cut()
+  // The fresh bar is planned in a microtask.
+  await Promise.resolve()
+  const seekPos = p.positionAt(tCut + 0.02)
+  await wait(250)
+  const seekBars = bars.slice(n0)
+  if (!seekPos || seekPos.step > 1) problems.push(`SEEK: the new bar should start at the cut, positionAt(+20 ms) = ${JSON.stringify(seekPos)}`)
+  if (!seekBars.length || seekBars[0]! <= last) problems.push(`SEEK: onBar should fire a new bar within 250 ms, got ${JSON.stringify(seekBars)} after ${last}`)
+  // STOP: cut + idle. No bars, positionAt null, visual bar null, still running.
+  await wait(500)
+  // jam's STOP: cut, then idle (the other order works too).
+  p.cut()
+  p.setIdle(true)
+  await wait(300)
+  const n1 = bars.length
+  const v1 = p.visual()
+  const stopped = { idle: p.idle, playing: p.playing, state: ctx.state, bar: v1.bar?.index ?? null, pos: p.positionAt(ctx.currentTime) }
+  if (!stopped.idle || !stopped.playing || stopped.state !== 'running') problems.push(`STOP: ${JSON.stringify(stopped)}`)
+  if (stopped.bar !== null || stopped.pos !== null) problems.push(`STOP: bar ${stopped.bar}, positionAt ${JSON.stringify(stopped.pos)} (want null)`)
+  // Live notes while idle.
+  const note = p.live('lead', { voice: 'keys.piano', midi: 71 }, 0.8)
+  const hit = p.live('drums', { kit: 'kit.soft', hit: 'k' }, 0.8)
+  await wait(150)
+  const heard = p.visual().recent.some(r => r.midi === 71)
+  note?.release()
+  hit?.release()
+  if (!note || !hit || !heard) problems.push(`live while idle: note ${!!note}, hit ${!!hit}, in recent ${heard}`)
+  await wait(1200)
+  if (bars.length !== n1) problems.push(`STOP: ${bars.length - n1} bars fired while idle`)
+  // PLAY: a fresh bar right away.
+  const n2 = bars.length
+  p.setIdle(false)
+  await wait(250)
+  const played = { idle: p.idle, bars: bars.slice(n2), bar: p.visual().bar?.index ?? null }
+  if (played.idle || !played.bars.length || played.bar === null) problems.push(`PLAY: ${JSON.stringify(played)}`)
+  return { seek: { pos: seekPos, bars: seekBars }, stopped, live: { note: !!note, hit: !!hit, heard }, played, problems }
 }
 
 /** Does a second stop() move the stop time (pad/drone ties rely on it)? Energy between 0.6 and 0.9 s says yes. */

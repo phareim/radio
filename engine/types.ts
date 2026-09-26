@@ -476,7 +476,7 @@ export interface ConductorLike {
 
 /** Cheap to read every animation frame. */
 export interface VisualState {
-  /** The bar sounding now (null before the first bar). */
+  /** The bar sounding now (null before the first bar, and from a cut until the next bar, e.g. while idle). */
   bar: BarPlan | null
   /** Position in the sounding bar, 0..16 (fractional). */
   step: number
@@ -494,11 +494,59 @@ export interface VisualState {
 }
 
 export interface RadioPlayer {
-  /** Create or resume the AudioContext (call from a user gesture) and start scheduling. */
-  start(): Promise<void>
-  /** Fade out over ~1 s, then suspend. The conductor keeps its state. */
+  /**
+   * Create or resume the AudioContext (call from a user gesture) and start
+   * scheduling. `idle` sets the idle transport (see `setIdle`) before
+   * anything is scheduled: `start({ idle: true })` gets the context running
+   * for live notes without planning a bar (and fades the volume in over
+   * 20 ms instead of 0.4 s). Without `idle` the setting is left as it is (the
+   * radio never idles, so `start()` behaves as it always has).
+   */
+  start(opts?: { idle?: boolean }): Promise<void>
+  /** Fade out over ~1 s, then suspend. The conductor keeps its state (and `idle` its setting). */
   stop(): void
+  /** The audio is running (true while idle too: the context runs and live notes play). */
   readonly playing: boolean
+  /**
+   * Transport cut (jam's STOP and SEEK; the radio never calls it). From `at`
+   * (default: now + ~10 ms, rounded up to a render quantum; clamped to
+   * [now, end of what is scheduled]):
+   * - every scheduled note, drum hit and ambience event starting at or after
+   *   `at` never sounds;
+   * - scheduled notes sounding at `at` fade out over `fade` s (default
+   *   0.08); percussive ones (drum hits other than risers, plucked and struck
+   *   voices, ambience events) ring out as they would have, unless `ring` is
+   *   false, when they fade over `fade` too;
+   * - the bar queue after `at` is dropped and the bar sounding at `at` ends
+   *   there; `visual()` and `positionAt()` forget the dropped bars
+   *   (positionAt is null from `at` until the next bar), `onBar` never fires
+   *   for them;
+   * - mix, pump, fx and ambience-level automation after `at` is cancelled and
+   *   held at its value at `at` (a reverb-size crossfade completes over 0.3 s);
+   * - the next bar is asked from the conductor in a microtask (after the
+   *   calling handler, before any timer) and starts at `at`, unless the
+   *   transport is idle by then. So `conductor.seek(n)` and `cut()` start
+   *   bar n almost at once, and `cut()` + `setIdle(true)` stops, in either
+   *   order within one handler. Its BarPlan.index is whatever the conductor
+   *   gives next: the indices of the dropped bars are not reused.
+   * Live notes are never cut. Echo and reverb tails ring on.
+   */
+  cut(opts?: CutOptions): void
+  /**
+   * The idle transport (jam's stopped state; not Controls.hold, which
+   * freezes the music's progression). `setIdle(true)`: no new bar is
+   * planned; whatever is already scheduled plays out (call `cut()` too to
+   * stop at once), then the ambience fades out over 0.5 s. The AudioContext
+   * keeps running, `live()` works, mix and effects stay where they were
+   * (live notes keep their reverb and delay). While idle and past the last
+   * scheduled bar, `visual().bar` is null (step 0), `positionAt` is null and
+   * `visual().playing` stays true. `setIdle(false)`: the next bar is planned
+   * right away and starts ~10 ms from now (or where the scheduled music
+   * ends, if it has not ended yet).
+   */
+  setIdle(on: boolean): void
+  /** The transport is idle (see `setIdle`). */
+  readonly idle: boolean
   /** Master volume 0..1. */
   setVolume(v: number): void
   visual(): VisualState
@@ -518,14 +566,15 @@ export interface RadioPlayer {
   setOutput(mode: 'speakers' | 'stream'): void
   /**
    * Play a note now, outside the bar plans (an instrument under the
-   * player's fingers). Needs a started player; returns null otherwise. The
-   * note sounds on `layer`'s bus with that layer's effects sends.
+   * player's fingers). Needs a started player (idle or not); returns null
+   * otherwise. The note sounds on `layer`'s bus with that layer's effects
+   * sends. `cut()` does not touch live notes.
    */
   live(layer: Layer, sound: LiveSound, vel: number, pan?: number): LiveNote | null
   /**
    * Where in the music an audio-clock time falls: the absolute bar index
    * (BarPlan.index) and the fractional step 0..16 in it, or null before the
-   * first bar or past what is scheduled.
+   * first bar or past what is scheduled (and from a cut until the next bar).
    */
   positionAt(time: number): { bar: number; step: number } | null
   /** Seconds between scheduling a sound and hearing it (output + base latency), 0 when unknown. */
@@ -540,6 +589,15 @@ export type LiveSound =
 export interface LiveNote {
   /** Release a held note now (percussive sounds ring on regardless). */
   release(): void
+}
+
+export interface CutOptions {
+  /** Audio-clock time of the cut; default now + ~10 ms. */
+  at?: number
+  /** Seconds a held note takes to fade out from `at`; default 0.08. */
+  fade?: number
+  /** Percussive sounds sounding at `at` ring out (default true); false fades them over `fade` too. */
+  ring?: boolean
 }
 
 export interface PlayerOptions {

@@ -12,7 +12,7 @@
  */
 import type { FxState } from '../types.ts'
 import { dottedEighth } from './timing.ts'
-import { clamp } from './synth.ts'
+import { clamp, holdAt } from './synth.ts'
 
 export interface Fx {
   input: GainNode
@@ -24,6 +24,11 @@ export interface Fx {
   probe: AudioNode
   /** Glide to a bar's fx state starting at `t0`; `bar` is the bar length (s). */
   apply(s: FxState, t0: number, bar: number, bpm: number): void
+  /**
+   * Transport cut: drop every glide scheduled after `at` and hold the values
+   * there. A reverb crossfade still under way completes over 0.3 s instead.
+   */
+  hold(at: number): void
 }
 
 /** Master trim before the limiter; calibrated so a full mix peaks near -3 dBFS. */
@@ -264,9 +269,32 @@ export function createFx(ac: BaseAudioContext): Fx {
   delRet.connect(input)
 
   let first = true
+  /** When the first state was set (a cut before it makes the next bar the first again). */
+  let firstAt = -1
+  /** When the last reverb crossfade ends. */
+  let xfadeEnd = -1
+  const params: AudioParam[] = [
+    tone.frequency, drive.gain, makeup.gain, wowDepth.gain, flutDepth.gain, hiss.gain,
+    ll.gain, rr.gain, lr.gain, rl.gain, reverbIn.gain, delayIn.gain, dl.delayTime, dr.delayTime,
+  ]
+
+  function hold(at: number): void {
+    for (const p of params) holdAt(p, at)
+    if (firstAt >= at) first = true
+    if (xfadeEnd > at) {
+      holdAt(verb.send.gain, at)
+      verb.send.gain.linearRampToValueAtTime(sizeComp(verb.size), at + 0.3)
+      if (retiring) {
+        holdAt(retiring.send.gain, at)
+        retiring.send.gain.linearRampToValueAtTime(0, at + 0.3)
+      }
+      xfadeEnd = at + 0.3
+    }
+  }
 
   function apply(s: FxState, t0: number, bar: number, bpm: number): void {
     const tau = Math.max(0.05, bar / 4)
+    if (first) firstAt = t0
     const set = (p: AudioParam, v: number) => {
       if (!Number.isFinite(v)) return
       if (first) p.setValueAtTime(v, t0)
@@ -307,6 +335,7 @@ export function createFx(ac: BaseAudioContext): Fx {
       verb = makeVerb(size, 0)
       verb.send.gain.setValueAtTime(0, t0)
       verb.send.gain.linearRampToValueAtTime(sizeComp(size), t0 + bar)
+      xfadeEnd = t0 + bar
       retiring = old
       // Free the old convolver once its tail has rung out.
       const ms = Math.max(0, (t0 + bar + old.size + 0.5 - ac.currentTime) * 1000)
@@ -320,7 +349,7 @@ export function createFx(ac: BaseAudioContext): Fx {
     first = false
   }
 
-  return { input, reverbIn, delayIn, gatedIn, output, probe: trim, apply }
+  return { input, reverbIn, delayIn, gatedIn, output, probe: trim, apply, hold }
 }
 
 function hissBuffer(ac: BaseAudioContext): AudioBuffer {

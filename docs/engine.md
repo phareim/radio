@@ -56,7 +56,9 @@ on any `BaseAudioContext`, so `tests/audio-check.mjs` renders it offline in
 headless Chromium and meters every voice, kit, texture and landscape
 (`npm run check:audio -- [filter] [--wav]`; WAVs go to `~/zshots/radio-audio/`;
 groups `play` and `live` render the played instruments as a player uses them
-and as live notes; `--smoke` runs the real player).
+and as live notes; group `cut` renders jam's transport (STOP, a live note while
+idle, PLAY; a SEEK) and checks the silences; `--smoke` runs the real player,
+including cut, setIdle and an idle start).
 A texture missing from `BarPlan.ambience` fades to 0; a layer missing from
 `mix` keeps its previous target.
 
@@ -76,7 +78,8 @@ A texture missing from `BarPlan.ambience` fades to 0; a layer missing from
   tempo-synced dotted eighth with filtered feedback.
 - **Voices** (`voices.ts`): `playVoice(v: VoiceCtx, id: VoiceId, midi, at, dur, vel, opts)`.
   Every voice in `VoiceId` exists. Grit adds detune spread and tape wow. The
-  returned `NoteHandle` can `extend` a tie or `release(at)` a note early.
+  returned `NoteHandle` can `extend` a tie, `release(at)` a note early, or
+  `cut` it for the transport.
 - **Played instruments** (`instruments.ts`, renderers in `render.ts`):
   `keys.piano`, `keys.felt` (additive, stretched partials, two-stage unison
   decay, hammer knock, velocity → brightness), `guitar.nylon`, `guitar.steel`,
@@ -90,20 +93,51 @@ A texture missing from `BarPlan.ambience` fades to 0; a layer missing from
   hit 5 ms from now on the layer's bus (a voice with a 30 s nominal length that
   `release()` ends; the glide lead slides while the previous live note is held).
   They show in `visual()` like scheduled notes. It returns null unless the
-  player is running, and a layer at mix gain 0 swallows them.
+  player is running (idle or not), and a layer at mix gain 0 swallows them.
+  A cut never touches them.
+- **Transport** (jam; the radio never calls these, so its playback is as
+  before). The contract is in `types.ts` (`RadioPlayer.cut`, `setIdle`, `start`).
+  - `cut({ at?, fade?, ring? })` takes back what is scheduled from `at`
+    (default now + 10 ms, on a render quantum). Every scheduled note, drum hit
+    and ambience event keeps a `Cuttable` handle (`synth.ts`) in the core
+    until its sources stop: one starting from `at` never sounds (VCA held at
+    0, sources stopped at their start); one sounding fades over `fade`
+    (0.08 s), except that percussive sounds (drum hits other than the riser,
+    plucked and struck voices, ambience events) ring out unless
+    `ring: false`. Events not yet built are dropped from the queue. Bars
+    from `at` go, the bar sounding at `at` ends there (`visual().bar` goes
+    null at its cut end, `positionAt` is null until the next bar). Mix, pump,
+    fx and ambience-level automation after `at` is dropped and held at its
+    value there (`cancelAndHoldAtTime`; Firefox lands on the value read back
+    from the bar ramps); a reverb-size crossfade finishes over 0.3 s. The
+    next bar is planned in a microtask and starts at `at`, so
+    `conductor.seek(n)` + `cut()` plays loop bar n about 10 ms later.
+  - `setIdle(true)` idles the transport (named apart from `Controls.hold`,
+    which freezes the progression): no bar is planned (what is scheduled
+    plays out; `cut()` too to stop at once), then the ambience fades out
+    over 0.5 s. The context keeps running, `live()` works, `playing` stays
+    true, `visual().bar` and `positionAt` are null. `setIdle(false)` plans a
+    bar at once, 10 ms ahead. `start({ idle: true })` wakes the context into
+    the idle state (volume up in 20 ms, nothing scheduled). jam: STOP =
+    `cut()` + `setIdle(true)`; PLAY from bar n = `seek(n)` +
+    `setIdle(false)` (or `start({ idle: false })` when the context is not
+    running); SEEK while playing = `seek(n)` + `cut()`.
 - **Position**: `player.positionAt(t)` maps an audio-clock time to the bar
   index and musical step (swing and tempo glide undone), from the last few
   seconds of scheduled bars; `player.latency` is output + base latency. An
   instrument places a played note at `positionAt(ac.currentTime - latency)`.
   The radio keeps `latencyHint: 'playback'`; jam asks for `'interactive'`.
-- **Drums** (`drums.ts`): `playDrum(v, kit, hit, at, vel, len?)`.
+- **Drums** (`drums.ts`): `playDrum(v, kit, hit, at, vel, len?)` → a
+  `Cuttable` (or null).
 - **Ambience** (`ambience.ts`): continuous textures with gain ramps, plus
   event sounds (birds, owls, gulls, chimes) spawned by the ambience's own
   random timers inside the scheduler tick; key-aware ones use `BarPlan.scale`.
+  Each event registers a `Cuttable` (its input gain is the cut gate).
 - **Visual**: `visual()` returns the sounding bar, step, a kick-driven beat
   envelope, per-layer levels and recent notes, from queues keyed to the audio
   clock.
-- Starts on a user gesture; `stop()` fades out and suspends.
+- Starts on a user gesture; `stop()` fades out and suspends (`idle` keeps
+  its setting).
 
 ## Landscapes
 

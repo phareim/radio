@@ -5,7 +5,8 @@
 //   flock /tmp/claude-1000/chrome.lock node tests/audio-check.mjs [filter] [--wav] [--json]
 //
 // filter: substring of "group:name", e.g. "voice:pad", "landscape", "hits:kit.chip".
-// --smoke: also run the live player for ~10 s (worker clock, AudioContext, onBar, stop/start).
+// --smoke: also run the live player for ~16 s (worker clock, AudioContext, onBar, stop/start,
+//   and jam's transport: cut while playing, cut + setIdle, live notes while idle, an idle start).
 // --wav: also write WAVs of the full mix and every landscape to the out dir.
 // Out dir: $RADIO_AUDIO_OUT or ~/zshots/radio-audio (snap Chromium cannot read /tmp).
 import { build } from 'esbuild'
@@ -36,9 +37,14 @@ copyFileSync(join(here, 'audio-harness.html'), join(out, 'audio-harness.html'))
 
 const b = await launch(out)
 let rows = []
+const smokeProblems = []
 try {
   await b.goto(`file://${join(out, 'audio-harness.html')}`)
-  if (smoke) console.log('player smoke test:', JSON.stringify(await b.eval('smokePlayer()'), null, 1))
+  if (smoke) {
+    const r = await b.eval('smokePlayer()')
+    console.log('player smoke test:', JSON.stringify(r, null, 1))
+    smokeProblems.push(...(r.problems ?? []).map(p => `smoke: ${p}`))
+  }
   rows = smoke && !filter ? [] : await b.eval(`runAudioCheck(${JSON.stringify(filter)}, ${wantWav})`)
   if (b.errors.length) console.error('browser errors:\n  ' + [...new Set(b.errors)].slice(0, 10).join('\n  '))
 } finally {
@@ -46,7 +52,7 @@ try {
 }
 
 const f1 = x => (x <= -199 ? '  -inf' : x.toFixed(1).padStart(6))
-const problems = []
+const problems = [...smokeProblems]
 const check = (label, s) => {
   if (s.nan) problems.push(`${label}: ${s.nan} NaN samples`)
   if (s.clip) problems.push(`${label}: ${s.clip} samples at full scale`)
@@ -73,6 +79,7 @@ if (json) {
 for (const r of rows) {
   check(`${r.group}:${r.name}`, r.stats)
   for (const e of r.visualErrors ?? []) problems.push(`${r.group}:${r.name}: visual ${e}`)
+  for (const e of r.checkErrors ?? []) problems.push(`${r.group}:${r.name}: ${e}`)
   for (const [h, w] of r.windows ?? []) {
     if (w.nan || w.clip || w.peak > -1) check(`${r.group}:${r.name}:${h}`, w)
     if (w.peak < -60) problems.push(`${r.group}:${r.name}:${h}: silent`)

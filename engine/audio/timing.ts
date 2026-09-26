@@ -150,3 +150,57 @@ export function fadeAtBarEnd(f: Fade, j: number): number {
   const p = Math.min(1, (j - f.start + 1) / f.bars)
   return f.from + (f.to - f.from) * p
 }
+
+// ---- transport cut (RadioPlayer.cut) -------------------------------------------------
+
+/** One linear segment of a param scheduled bar by bar: v0 at t0 to v1 at t1. */
+export type Ramp = [t0: number, v0: number, t1: number, v1: number]
+
+/**
+ * The value of back-to-back linear ramps (sorted by t0) at time `t`: inside a
+ * ramp it interpolates, after the last one it holds v1, before the first it
+ * is the first v0; `fallback` when there are none.
+ */
+export function rampAt(ramps: readonly Ramp[], t: number, fallback = 0): number {
+  if (!ramps.length) return fallback
+  let hit = -1
+  for (let i = ramps.length - 1; i >= 0; i--) if (ramps[i]![0] <= t) { hit = i; break }
+  if (hit < 0) return ramps[0]![1]
+  const [t0, v0, t1, v1] = ramps[hit]!
+  if (t >= t1 || t1 <= t0) return v1
+  return v0 + ((v1 - v0) * (t - t0)) / (t1 - t0)
+}
+
+/** Drop ramps that ended before `before`, keeping at least the last one. */
+export function pruneRamps(ramps: Ramp[], before: number): void {
+  let i = 0
+  while (i < ramps.length - 1 && ramps[i]![2] < before) i++
+  if (i > 0) ramps.splice(0, i)
+}
+
+/**
+ * Cut a queue of back-to-back bars (sorted by t0) at `at`, in place: bars
+ * starting at or after `at` are removed, the bar sounding at `at` ends there
+ * (t1 = at). Returns the removed bars.
+ */
+export function cutBars<T extends { t0: number; t1: number }>(bars: T[], at: number): T[] {
+  let i = bars.length
+  while (i > 0 && bars[i - 1]!.t0 >= at) i--
+  const gone = bars.splice(i)
+  const last = bars[bars.length - 1]
+  if (last && last.t1 > at) last.t1 = at
+  return gone
+}
+
+/** Remove, in place, the items for which `keep` is false (order kept). */
+export function keepWhere<T>(xs: T[], keep: (x: T) => boolean): void {
+  let j = 0
+  for (let i = 0; i < xs.length; i++) if (keep(xs[i]!)) xs[j++] = xs[i]!
+  xs.length = j
+}
+
+/** `t` rounded up to the next render quantum (128 frames) of a `sampleRate` clock. */
+export function quantumAfter(t: number, sampleRate: number): number {
+  const q = 128 / (sampleRate > 0 ? sampleRate : 48000)
+  return Math.ceil(t / q - 1e-9) * q
+}
