@@ -20,6 +20,8 @@ jobs:
 
       - run: node --no-warnings --test tests/engine.test.ts
 
+      - run: node --no-warnings --test tests/piece.test.ts
+
       - run: node --no-warnings --test 'backend/test/*.test.mjs'
 
       - run: npm run build

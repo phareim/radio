@@ -229,7 +229,8 @@ function chordAt(spans: ChordSpan[], step: number): Chord {
   return c
 }
 
-const PAN: Partial<Record<Layer, number>> = { arp: 0.28, counter: -0.3, bells: 0.4, perc: -0.2 }
+/** Where the composer pans a layer's notes (layers not listed sit in the centre). */
+export const PAN: Partial<Record<Layer, number>> = { arp: 0.28, counter: -0.3, bells: 0.4, perc: -0.2 }
 
 // ---- parts -------------------------------------------------------------------
 

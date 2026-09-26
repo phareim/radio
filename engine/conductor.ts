@@ -16,7 +16,7 @@
  *   lead step out to breathe.
  */
 import type {
-  BarPlan, Chord, ChordSpan, ConductorLike, Controls, FxState, Key, Landscape, Layer, LayerMix,
+  BarPlan, Chord, ChordSpan, ConductorLike, Controls, FxSpec, FxState, Key, Landscape, Layer, LayerMix,
   Mode, Progression, TransitionInfo,
 } from './types.ts'
 import { DEFAULT_CONTROLS, LAYERS } from './types.ts'
@@ -80,6 +80,31 @@ export function modeFor(L: Landscape, mood: number): Mode {
   const m = Math.max(0, Math.min(1, mood))
   const eff = m < 0.5 ? lerp(0, L.mood, m / 0.5) : lerp(L.mood, 1, (m - 0.5) / 0.5)
   return L.moods[Math.round(eff * (L.moods.length - 1))]!
+}
+
+/**
+ * A landscape's effects shaped by the Space, Grit and Mood knobs. The pump
+ * only works while drums sound.
+ */
+export function shapeFx(f: FxSpec, controls: Pick<Controls, 'space' | 'grit' | 'mood'>, drums: boolean): FxState {
+  const space = controls.space
+  return {
+    reverb: Math.min(1, f.reverb * (0.35 + 1.3 * space)),
+    delay: Math.min(1, f.delay * (0.35 + 1.3 * space)),
+    reverbSize: f.reverbSize * (0.65 + 0.7 * space),
+    tone: Math.max(0.05, Math.min(1, f.tone * (1.08 - 0.16 * controls.mood))),
+    grit: Math.min(1, f.grit * 0.4 + controls.grit * 0.75),
+    pump: (f.pump ?? 0) * (drums ? 1 : 0),
+    width: 0.55 + 0.45 * space,
+  }
+}
+
+/** Ambience levels thinned a little as intensity rises. */
+export function thinAmbience(ambience: Landscape['ambience'], intensity: number): BarPlan['ambience'] {
+  const thin = 1 - 0.1 * intensity
+  const out: BarPlan['ambience'] = {}
+  for (const [k, v] of Object.entries(ambience)) out[k as keyof BarPlan['ambience']] = (v ?? 0) * thin
+  return out
 }
 
 /** The chord a mode cadences into its tonic from, as a token. */
@@ -380,17 +405,7 @@ export function createConductor(opts: ConductorOptions): Conductor {
   // ---- one bar ----------------------------------------------------------------
 
   function fxFor(land: Landscape): FxState {
-    const f = land.fx
-    const space = controls.space
-    return {
-      reverb: Math.min(1, f.reverb * (0.35 + 1.3 * space)),
-      delay: Math.min(1, f.delay * (0.35 + 1.3 * space)),
-      reverbSize: f.reverbSize * (0.65 + 0.7 * space),
-      tone: Math.max(0.05, Math.min(1, f.tone * (1.08 - 0.16 * controls.mood))),
-      grit: Math.min(1, f.grit * 0.4 + controls.grit * 0.75),
-      pump: (f.pump ?? 0) * (present.has('drums') ? 1 : 0),
-      width: 0.55 + 0.45 * space,
-    }
+    return shapeFx(land.fx, controls, present.has('drums'))
   }
 
   function mixFx(a: FxState, b: FxState, t: number): FxState {
@@ -402,10 +417,7 @@ export function createConductor(opts: ConductorOptions): Conductor {
   }
 
   function ambienceFor(land: Landscape): BarPlan['ambience'] {
-    const thin = 1 - 0.1 * controls.intensity
-    const out: BarPlan['ambience'] = {}
-    for (const [k, v] of Object.entries(land.ambience)) out[k as keyof BarPlan['ambience']] = (v ?? 0) * thin
-    return out
+    return thinAmbience(land.ambience, controls.intensity)
   }
 
   /** The highest intensity whose layers are all sounding. */

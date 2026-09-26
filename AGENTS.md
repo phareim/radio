@@ -12,6 +12,7 @@ Opus does; Opus can also compose new landscapes.
 | Engine (pure TS: theory, composer, conductor, landscapes) | `engine/` | `docs/engine.md` |
 | Audio (Web Audio player, voices, drums, ambience, fx) | `engine/audio/` | `docs/engine.md` (player) |
 | Pixel scenes, one per landscape | `scene/` | `docs/landscapes.md` |
+| Pieces for jam (format, notation, piece conductor, landscape derivation, growing, pattern library) | `engine/piece/` | `docs/piece.md` |
 | Web app (Nuxt 3 Worker, Reader login, proxies to the backend) | repo root | `README.md` |
 | Backend `radio-api` on Sleeper (feedback, compose, review, painting scenes for composed channels) | `backend/` | `backend/README.md` |
 
@@ -31,6 +32,7 @@ Opus does; Opus can also compose new landscapes.
 ## Commands
 
 - `node --no-warnings --test tests/engine.test.ts` — engine invariants
+- `node --no-warnings --test tests/piece.test.ts` — pieces (jam)
 - `node --no-warnings tests/timeline.ts [bars]` — print a scripted session bar by bar
 - `node --no-warnings --test 'backend/test/*.test.mjs'` — backend
 - `npm run dev` — the app on port 3040 (no login on localhost)

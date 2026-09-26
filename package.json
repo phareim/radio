@@ -9,9 +9,9 @@
     "build": "nuxt build",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
-    "test": "node --no-warnings --test tests/engine.test.ts && node --no-warnings --test 'backend/test/*.test.mjs'",
+    "test": "node --no-warnings --test tests/engine.test.ts tests/piece.test.ts && node --no-warnings --test 'backend/test/*.test.mjs'",
     "icons": "python3 scripts/make-icons.py",
-    "test:engine": "node --no-warnings --test tests/engine.test.ts tests/audio-timing.test.ts",
+    "test:engine": "node --no-warnings --test tests/engine.test.ts tests/piece.test.ts tests/audio-timing.test.ts",
     "test:backend": "node --no-warnings --test 'backend/test/*.test.mjs'",
     "check:audio": "flock /tmp/claude-1000/chrome.lock node tests/audio-check.mjs",
     "timeline": "node --no-warnings tests/timeline.ts"
