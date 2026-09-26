@@ -1,0 +1,13 @@
+{
+  "//": "The engine is plain erasable TypeScript run by Node and bundled by Vite. Its own config keeps it independent of the Nuxt app's generated .nuxt/tsconfig.json, so jam (radio as a git submodule) can bundle it.",
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "skipLibCheck": true
+  }
+}
