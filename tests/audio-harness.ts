@@ -7,7 +7,7 @@
  * pre-limiter peak, DC, NaN, clipped samples, spectral centroid and the
  * share of energy above 5 kHz.
  */
-import type { AmbienceId, ConductorLike, KitId, VoiceId } from '../engine/types.ts'
+import type { AmbienceId, ConductorLike, KitId, LiveNote, VoiceId } from '../engine/types.ts'
 import { createCore } from '../engine/audio/core.ts'
 import { createPlayer } from '../engine/audio/player.ts'
 import { VOICE_IDS } from '../engine/audio/voices.ts'
@@ -15,7 +15,7 @@ import { KIT_IDS } from '../engine/audio/drums.ts'
 import { AMBIENCE_IDS } from '../engine/audio/ambience.ts'
 import { createConductor } from '../engine/conductor.ts'
 import { LANDSCAPES } from '../engine/landscapes/index.ts'
-import { soloVoice, kitHits, kitGroove, soloAmbience, fullMix, HIT_ORDER } from './audio-fixtures.ts'
+import { soloVoice, kitHits, kitGroove, soloAmbience, fullMix, playPart, silentLayer, layerOf, HIT_ORDER } from './audio-fixtures.ts'
 
 const SR = 48000
 
@@ -31,6 +31,8 @@ interface Case {
   wav?: boolean
   /** Check visual() invariants while rendering. */
   visual?: boolean
+  /** Called at every scheduler tick (0.5 s apart) after core.tick: live notes. */
+  onTick?: (core: ReturnType<typeof createCore>, t: number, errs: string[]) => void
 }
 
 export interface Stats {
@@ -233,6 +235,7 @@ async function render(c: Case): Promise<Row> {
     ac.suspend(at).then(() => {
       core.tick(at, at + 0.7)
       core.due(at)
+      c.onTick?.(core, at, visualErrors)
       if (c.visual) checkVisual(core.visual(at), at, visualErrors)
       return ac.resume()
     }).catch(() => {})
@@ -260,6 +263,13 @@ function cases(filter: string, wavAll: boolean): Case[] {
   }
   for (const a of AMBIENCE_IDS) out.push({ group: 'ambience', name: a, seconds: 20, conductor: () => soloAmbience(a as AmbienceId), from: 1 })
   out.push({ group: 'mix', name: 'fullmix', seconds: 24, conductor: fullMix, from: 2, wav: true, visual: true })
+  // The played instruments as a player uses them (listen with --wav).
+  for (const v of PLAYED) out.push({ group: 'play', name: v, seconds: 14, conductor: () => playPart(v), wav: wavAll })
+  // Live notes: a chord (or a hit) held for half a second, then let go; dry, so a click at the release would show.
+  for (const v of [...PLAYED, 'lead.glide', 'pad.warm'] as VoiceId[]) {
+    out.push({ group: 'live', name: v, seconds: 8, conductor: () => silentLayer(layerOf(v), { reverb: 0, delay: 0 }), wav: wavAll, onTick: liveChords(v) })
+  }
+  out.push({ group: 'live', name: 'kit.soft', seconds: 8, conductor: () => silentLayer('drums'), wav: wavAll, onTick: liveHits('kit.soft') })
   // Reverb/delay share: the same line dry and at the default sends.
   for (const v of ['lead.square', 'pad.saw', 'bell.glass'] as VoiceId[]) {
     out.push({ group: 'wet', name: `${v}:dry`, seconds: 14, conductor: () => soloVoice(v, { reverb: 0, delay: 0 }) })
@@ -291,6 +301,51 @@ function cases(filter: string, wavAll: boolean): Case[] {
   return pickd
 }
 
+const PLAYED: VoiceId[] = ['keys.piano', 'keys.felt', 'guitar.nylon', 'guitar.steel', 'guitar.mute', 'bass.finger']
+
+/**
+ * Live notes: a chord on even ticks, released on the next tick (so each
+ * release sits alone, where a click would show); the glide lead plays
+ * overlapping notes instead so it slides. Checks visual() shows them.
+ */
+function liveChords(v: VoiceId): NonNullable<Case['onTick']> {
+  let held: LiveNote[] = []
+  let k = 0
+  let tick = 0
+  const glide = v === 'lead.glide'
+  const low = v.startsWith('bass') ? -24 : glide ? 12 : 0
+  const shapes = [[62, 65, 69], [59, 62, 67], [60, 64, 67], [57, 60, 64]]
+  return (core, t, errs) => {
+    const odd = tick++ % 2 === 1
+    if (glide) {
+      // Start the next note, then let go of the previous one: legato.
+      const prev = held
+      held = []
+      if (t <= 6.5) held.push(core.live('lead', { voice: v, midi: shapes[k++ % shapes.length]![0]! + low }, 0.8))
+      for (const h of prev) h.release()
+      return
+    }
+    for (const h of held) h.release()
+    held = []
+    if (t > 6.5 || odd) return
+    const shape = shapes[k++ % shapes.length]!
+    const notes = v.startsWith('bass') ? [shape[0]!] : shape
+    for (const m of notes) held.push(core.live(layerOf(v), { voice: v, midi: m + low }, 0.5 + 0.4 * ((k % 3) / 2)))
+    const vis = core.visual(core.res.ac.currentTime + 0.02)
+    if (!vis.recent.some(r => r.age < 0.1) && errs.length < 6) errs.push(`t=${t.toFixed(1)}: live note missing from recent`)
+    if (!(vis.levels[layerOf(v)] > 0) && errs.length < 6) errs.push(`t=${t.toFixed(1)}: live note missing from levels`)
+  }
+}
+
+function liveHits(kit: KitId): NonNullable<Case['onTick']> {
+  const seq = ['k', 'h', 's', 'h'] as const
+  let k = 0
+  return (core, t) => {
+    if (t > 6.5) return
+    core.live('drums', { kit, hit: seq[k++ % seq.length]! }, 0.85).release()
+  }
+}
+
 declare global {
   interface Window {
     runAudioCheck(filter: string, wavAll: boolean): Promise<Row[]>
@@ -304,6 +359,7 @@ window.smokePlayer = async () => {
   const p = createPlayer(conductor)
   const bars: number[] = []
   const off = p.onBar(b => bars.push(b.index))
+  const liveBefore = p.live('lead', { voice: 'keys.piano', midi: 60 }, 0.8)
   await p.start()
   const wait = (ms: number) => new Promise(r => setTimeout(r, ms))
   await wait(6000)
@@ -316,6 +372,18 @@ window.smokePlayer = async () => {
   let beat = 0
   for (let i = 0; i < 40; i++) { beat = Math.max(beat, p.visual().beat); await wait(25) }
   res.beatSeen = beat > 0.3
+  // Live notes and the clock position (jam): null before start, a note and a position while playing.
+  const note = p.live('lead', { voice: 'keys.piano', midi: 64 }, 0.8)
+  const hit = p.live('drums', { kit: 'kit.soft', hit: 's' }, 0.8)
+  await wait(300)
+  note?.release()
+  hit?.release()
+  const ctx = p.context!
+  res.live = { before: liveBefore, note: !!note, hit: !!hit, recent: p.visual().recent.some(r => r.midi === 64) }
+  res.positionAt = p.positionAt(ctx.currentTime - p.latency)
+  res.positionFar = p.positionAt(ctx.currentTime + 60)
+  res.latency = +p.latency.toFixed(4)
+  res.sampleRate = ctx.sampleRate
   p.setOutput('stream')
   p.setOutput('stream')
   p.setOutput('speakers')

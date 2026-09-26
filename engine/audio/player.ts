@@ -1,5 +1,5 @@
 /**
- * The live player: `createPlayer(conductor)` → RadioPlayer (types.ts).
+ * The live player: `createPlayer(conductor, opts?)` → RadioPlayer (types.ts).
  *
  * Owns the AudioContext and the clock; everything musical happens in the
  * core (core.ts). The clock is a Web Worker posting ticks (a hidden tab
@@ -11,8 +11,12 @@
  * element: iOS lock screen, OS media controls) and, in 'speakers' mode (the
  * default), also → the context's destination. A page that plays `stream`
  * through an element calls setOutput('stream') so the music is not doubled.
+ *
+ * Latency: the radio asks for 'playback' (bigger buffers, the scheduler hides
+ * them). An instrument (jam) asks for 'interactive' and plays live notes with
+ * `live()`; `positionAt(ac.currentTime - latency)` places what was heard.
  */
-import type { ConductorLike, RadioPlayer, VisualState, BarPlan, Layer } from '../types.ts'
+import type { ConductorLike, RadioPlayer, VisualState, BarPlan, Layer, LiveSound, LiveNote, PlayerOptions } from '../types.ts'
 import { LAYERS } from '../types.ts'
 import { createCore, type Core } from './core.ts'
 
@@ -77,7 +81,8 @@ const EMPTY_LEVELS = (): Record<Layer, number> => {
   return l
 }
 
-export function createPlayer(conductor: ConductorLike): RadioPlayer {
+export function createPlayer(conductor: ConductorLike, opts: PlayerOptions = {}): RadioPlayer {
+  const latencyHint = opts.latencyHint === 'interactive' ? 'interactive' : 'playback'
   let ac: AudioContext | null = null
   let core: Core | null = null
   let volume: GainNode | null = null
@@ -121,7 +126,8 @@ export function createPlayer(conductor: ConductorLike): RadioPlayer {
     const Ctor = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
     if (!Ctor) throw new Error('Web Audio is not available')
     // 'playback' asks for larger buffers: fewer dropouts, less CPU; the scheduler hides the latency.
-    ac = new Ctor({ latencyHint: 'playback' })
+    // 'interactive' is for live playing, where the latency is what the player hears.
+    ac = new Ctor({ latencyHint })
     core = createCore(ac, conductor)
     volume = ac.createGain()
     volume.gain.value = 0
@@ -201,6 +207,16 @@ export function createPlayer(conductor: ConductorLike): RadioPlayer {
     return { ...core.visual(heard()), playing: playing && !stopTimer }
   }
 
+  function live(layer: Layer, sound: LiveSound, vel: number, pan?: number): LiveNote | null {
+    if (!ac || !core || !playing || stopTimer || ac.state !== 'running') return null
+    try {
+      return core.live(layer, sound, vel, pan)
+    } catch (err) {
+      console.error('radio: live note failed', err)
+      return null
+    }
+  }
+
   function onBar(cb: (plan: BarPlan) => void): () => void {
     listeners.add(cb)
     return () => { listeners.delete(cb) }
@@ -216,5 +232,8 @@ export function createPlayer(conductor: ConductorLike): RadioPlayer {
     get context() { return ac },
     get stream() { return streamDest ? streamDest.stream : null },
     setOutput,
+    live,
+    positionAt: (time: number) => (core ? core.positionAt(time) : null),
+    get latency() { return ac ? (ac.outputLatency || 0) + (ac.baseLatency || 0) : 0 },
   }
 }

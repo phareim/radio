@@ -27,6 +27,8 @@ export interface Resources {
   pulse12: PeriodicWave
   /** Current grit 0..1; voices add a little random detune with it. */
   grit: number
+  /** Rendered note buffers (plucked strings, pianos), built on first use. */
+  bufs: BufferCache
 }
 
 export function createResources(ac: BaseAudioContext): Resources {
@@ -101,7 +103,54 @@ export function createResources(ac: BaseAudioContext): Resources {
     for (let k = 1; k < n; k++) imag[k] = ((2 / (k * Math.PI)) * Math.sin(k * Math.PI * duty)) * (k > 24 ? 0.6 : 1)
     return ac.createPeriodicWave(real, imag)
   }
-  return { ac, white, pink, brown, metal, nesLong, nesShort, pulse25: pulse(0.25), pulse12: pulse(0.125), grit: 0 }
+  return {
+    ac, white, pink, brown, metal, nesLong, nesShort, pulse25: pulse(0.25), pulse12: pulse(0.125), grit: 0,
+    bufs: createBufferCache(ac),
+  }
+}
+
+// ---- rendered note buffers ----------------------------------------------------
+
+/**
+ * Note buffers rendered in JS (Karplus-Strong strings, additive pianos),
+ * keyed by voice, pitch and velocity bucket. Least recently used entries go
+ * first once the total passes `budget` samples (default 12 M: 48 MB, about
+ * 40 held piano notes or 80 guitar notes).
+ */
+export interface BufferCache {
+  get(key: string, render: () => Float32Array): AudioBuffer
+  /** Samples held, for leak checks. */
+  readonly samples: number
+  readonly size: number
+}
+
+export function createBufferCache(ac: BaseAudioContext, budget = 12_000_000): BufferCache {
+  const map = new Map<string, AudioBuffer>()
+  let samples = 0
+  return {
+    get(key, render) {
+      const hit = map.get(key)
+      if (hit) {
+        // Map order is insertion order: re-insert to mark it recently used.
+        map.delete(key)
+        map.set(key, hit)
+        return hit
+      }
+      const data = render()
+      const buf = ac.createBuffer(1, Math.max(1, data.length), ac.sampleRate)
+      buf.getChannelData(0).set(data)
+      map.set(key, buf)
+      samples += buf.length
+      for (const [k, b] of map) {
+        if (samples <= budget || map.size <= 1) break
+        map.delete(k)
+        samples -= b.length
+      }
+      return buf
+    },
+    get samples() { return samples },
+    get size() { return map.size },
+  }
 }
 
 function normalise(d: Float32Array, peak: number): void {
@@ -172,6 +221,12 @@ export interface NoteHandle {
   end: number
   /** Move the release to `newEnd`. False if the note cannot be extended (percussive, already releasing). */
   extend(newEnd: number): boolean
+  /**
+   * Release the note at `at` (clamped to now): cancel the scheduled release
+   * and fade out over the envelope's release, then stop the sources. No-op
+   * once the note is already releasing or gone.
+   */
+  release(at: number): void
 }
 
 /** Start a note: a VCA (silent until an envelope is applied), panned if asked, into `dest`. */
@@ -278,6 +333,7 @@ export function envelope(n: Note, dur: number, e: Env): { end: number; relAt: nu
 export function finish(n: Note, env: { end: number; relAt: number }, release: number, nominalEnd: number): NoteHandle {
   let end = env.end
   let relAt = env.relAt
+  let released = false
   for (const s of n.srcs) s.stop(end)
   const first = n.srcs[0]
   if (first) {
@@ -285,10 +341,11 @@ export function finish(n: Note, env: { end: number; relAt: number }, release: nu
       try { n.tail.disconnect() } catch { /* already gone */ }
     }
   }
+  const rel = Math.max(0.004, release / 5)
   const handle: NoteHandle = {
     end: nominalEnd,
     extend(newEnd: number): boolean {
-      if (relAt < 0 || newEnd <= relAt) return false
+      if (released || relAt < 0 || newEnd <= relAt) return false
       // Only while the release is still ahead of the audio clock.
       if (relAt < n.ac.currentTime + 0.02) return false
       const newStop = newEnd + Math.max(0.02, release * 1.3)
@@ -299,11 +356,33 @@ export function finish(n: Note, env: { end: number; relAt: number }, release: nu
       }
       const g = n.amp.gain
       g.cancelScheduledValues(relAt)
-      g.setTargetAtTime(0, newEnd, Math.max(0.004, release / 5))
+      g.setTargetAtTime(0, newEnd, rel)
       relAt = newEnd
       end = newStop
       handle.end = newEnd
       return true
+    },
+    release(at: number): void {
+      const t = Math.max(Number.isFinite(at) ? at : 0, n.ac.currentTime)
+      if (released || t >= end || (relAt >= 0 && t >= relAt)) return
+      released = true
+      const g = n.amp.gain
+      // Hold the curve where it is at t (mid-attack or mid-decay), then fall from there.
+      const hold = (g as AudioParam & { cancelAndHoldAtTime?: (t: number) => AudioParam }).cancelAndHoldAtTime
+      if (typeof hold === 'function') hold.call(g, t)
+      else g.cancelScheduledValues(t)
+      // Percussive notes (no gate) have a short release of zero: damp them like a quick hand.
+      const tau = relAt < 0 ? 0.02 : rel
+      g.setTargetAtTime(0, t, tau)
+      const stop = t + Math.max(0.03, tau * 6.5)
+      if (stop < end) {
+        try {
+          for (const s of n.srcs) s.stop(stop)
+        } catch { /* the sources end on their own schedule */ }
+      }
+      relAt = t
+      end = Math.min(end, stop)
+      handle.end = t
     },
   }
   return handle

@@ -30,6 +30,8 @@ export interface BarTiming {
   stepAt(t: number): number
   /** Tempo at step `s`. */
   bpmAt(s: number): number
+  /** Inverse of `at`: the musical (swung) step `t` seconds into the bar. */
+  stepAtSwung(t: number): number
 }
 
 const EPS = 1e-9
@@ -42,6 +44,16 @@ export function swingWarp(s: number, swing: number): number {
   const p = s - pair * 2
   const w = p < 1 ? p * (1 + sw) : 1 + sw + (p - 1) * (1 - sw)
   return pair * 2 + w
+}
+
+/** Inverse of swingWarp: the musical step at warped position `w`. */
+export function swingUnwarp(w: number, swing: number): number {
+  const sw = Math.max(0, Math.min(0.5, swing || 0))
+  if (sw === 0) return w
+  const pair = Math.floor(w / 2)
+  const q = w - pair * 2
+  const p = q < 1 + sw ? q / (1 + sw) : 1 + (q - 1 - sw) / (1 - sw)
+  return pair * 2 + p
 }
 
 export function barTiming(bpmStart: number, bpmEnd: number, swing: number): BarTiming {
@@ -68,7 +80,36 @@ export function barTiming(bpmStart: number, bpmEnd: number, swing: number): BarT
     stepAt,
     at: (s: number) => straight(swingWarp(s, swing)),
     bpmAt: (s: number) => (s >= 16 ? e : s <= 0 ? a : a + b * s),
+    stepAtSwung: (t: number) => swingUnwarp(stepAt(t), swing),
   }
+}
+
+/** A scheduled bar on the audio clock. */
+export interface PlacedBar {
+  /** BarPlan.index */
+  index: number
+  t0: number
+  t1: number
+  tm: BarTiming
+}
+
+/**
+ * Where audio time `time` falls among scheduled bars (sorted by t0, back to
+ * back): the bar's index and the musical step 0..16 (swing and tempo glide
+ * undone), or null before the first bar or past the last one.
+ */
+export function positionIn(bars: readonly PlacedBar[], time: number): { bar: number; step: number } | null {
+  if (!Number.isFinite(time)) return null
+  let lo = 0, hi = bars.length - 1, hit = -1
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1
+    if (bars[mid]!.t0 <= time) { hit = mid; lo = mid + 1 } else hi = mid - 1
+  }
+  if (hit < 0) return null
+  const b = bars[hit]!
+  if (time >= b.t1) return null
+  const step = Math.max(0, Math.min(16, b.tm.stepAtSwung(time - b.t0)))
+  return { bar: b.index, step: step >= 16 ? 16 - 1e-9 : step }
 }
 
 /** A tempo the math can survive: finite, 20..400 bpm. */

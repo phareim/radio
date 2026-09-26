@@ -47,14 +47,16 @@ re-plans from wherever the music is.
 
 ## The player (engine/audio/)
 
-`createPlayer(conductor: ConductorLike): RadioPlayer` in `player.ts` (types
-in `types.ts`) is the live wrapper: AudioContext, Worker clock, volume, the
+`createPlayer(conductor: ConductorLike, opts?: PlayerOptions): RadioPlayer` in
+`player.ts` (types in `types.ts`) is the live wrapper: AudioContext, Worker clock, volume, the
 MediaStream and `setOutput('speakers' | 'stream')` (the page plays the stream
 through an `<audio>` element for iOS lock-screen playback and then turns the
 direct speaker output off). The scheduling itself lives in `core.ts` and runs
 on any `BaseAudioContext`, so `tests/audio-check.mjs` renders it offline in
 headless Chromium and meters every voice, kit, texture and landscape
-(`npm run check:audio -- [filter] [--wav]`; WAVs go to `~/zshots/radio-audio/`).
+(`npm run check:audio -- [filter] [--wav]`; WAVs go to `~/zshots/radio-audio/`;
+groups `play` and `live` render the played instruments as a player uses them
+and as live notes; `--smoke` runs the real player).
 A texture missing from `BarPlan.ambience` fades to 0; a layer missing from
 `mix` keeps its previous target.
 
@@ -73,7 +75,27 @@ A texture missing from `BarPlan.ambience` fades to 0; a layer missing from
   `reverbSize` changes rebuild it and crossfade old/new over a bar. Delay is
   tempo-synced dotted eighth with filtered feedback.
 - **Voices** (`voices.ts`): `playVoice(v: VoiceCtx, id: VoiceId, midi, at, dur, vel, opts)`.
-  Every voice in `VoiceId` exists. Grit adds detune spread and tape wow.
+  Every voice in `VoiceId` exists. Grit adds detune spread and tape wow. The
+  returned `NoteHandle` can `extend` a tie or `release(at)` a note early.
+- **Played instruments** (`instruments.ts`, renderers in `render.ts`):
+  `keys.piano`, `keys.felt` (additive, stretched partials, two-stage unison
+  decay, hammer knock, velocity → brightness), `guitar.nylon`, `guitar.steel`,
+  `guitar.mute`, `bass.finger` (Karplus-Strong in JS: a DelayNode loop cannot
+  be shorter than one 128-frame render quantum). Notes render once per voice,
+  pitch, velocity bucket and round-robin variant into an LRU cache of
+  AudioBuffers (`res.bufs`, 12 M samples) and play through a gated VCA: they
+  ring while held and damp on release. First press of a low piano key renders
+  in up to ~60 ms; mid-range notes in 5–20 ms.
+- **Live notes**: `player.live(layer, sound, vel, pan?)` plays a voice or a drum
+  hit 5 ms from now on the layer's bus (a voice with a 30 s nominal length that
+  `release()` ends; the glide lead slides while the previous live note is held).
+  They show in `visual()` like scheduled notes. It returns null unless the
+  player is running, and a layer at mix gain 0 swallows them.
+- **Position**: `player.positionAt(t)` maps an audio-clock time to the bar
+  index and musical step (swing and tempo glide undone), from the last few
+  seconds of scheduled bars; `player.latency` is output + base latency. An
+  instrument places a played note at `positionAt(ac.currentTime - latency)`.
+  The radio keeps `latencyHint: 'playback'`; jam asks for `'interactive'`.
 - **Drums** (`drums.ts`): `playDrum(v, kit, hit, at, vel, len?)`.
 - **Ambience** (`ambience.ts`): continuous textures with gain ramps, plus
   event sounds (birds, owls, gulls, chimes) spawned by the ambience's own

@@ -59,7 +59,10 @@ function fake(bar: (i: number) => Bar): ConductorLike {
 
 export function layerOf(v: VoiceId): Layer {
   const fam = v.split('.')[0]
-  return ({ lead: 'lead', mallet: 'lead', pluck: 'lead', arp: 'arp', pad: 'pad', bass: 'bass', bell: 'bells', counter: 'counter', drone: 'drone' } as Record<string, Layer>)[fam!] ?? 'lead'
+  return ({
+    lead: 'lead', mallet: 'lead', pluck: 'lead', arp: 'arp', pad: 'pad', bass: 'bass', bell: 'bells', counter: 'counter', drone: 'drone',
+    keys: 'lead', guitar: 'lead',
+  } as Record<string, Layer>)[fam!] ?? 'lead'
 }
 
 const on = (l: Layer): Partial<Record<Layer, LayerMix>> => ({ [l]: { gain: 1, fadeBars: 0 } })
@@ -96,7 +99,7 @@ export function soloVoice(voice: VoiceId, fx: Partial<FxState> = {}): ConductorL
       for (let s = 0; s < 16; s++) notes.push(n(layer, voice, tones[s % tones.length]! + 12, s, 1, s % 4 === 0 ? 0.85 : 0.65, voice === 'arp.seq' ? { opts: { cutoff: 0.2 + 0.6 * ((i * 16 + s) % 64) / 64 } } : {}))
     } else if (fam === 'bell') {
       notes.push(n(layer, voice, 81, 0, 8, 0.8), n(layer, voice, 88, 6, 8, 0.6), n(layer, voice, 86, 12, 4, 0.7))
-    } else if (fam === 'mallet' || fam === 'pluck') {
+    } else if (fam === 'mallet' || fam === 'pluck' || fam === 'guitar') {
       const tones = ch.slice(1).map(m => m + 12)
       for (let s = 0; s < 16; s += 2) notes.push(n(layer, voice, tones[(s / 2 + i) % tones.length]!, s, 2, s % 4 === 0 ? 0.85 : 0.6))
     } else {
@@ -105,6 +108,42 @@ export function soloVoice(voice: VoiceId, fx: Partial<FxState> = {}): ConductorL
     }
     return { notes, mix: on(layer), fx }
   })
+}
+
+/**
+ * The played instruments the way a player uses them (for listening and
+ * clipping, not level matching): piano chords under a melody, a strummed
+ * guitar, palm-muted eighths, a finger bass line with ghost notes.
+ */
+export function playPart(voice: VoiceId): ConductorLike {
+  const layer = layerOf(voice)
+  return fake(i => {
+    const ch = CHORDS[Math.floor(i / 2) % 4]!
+    const notes: NoteEvent[] = []
+    const root = ch[0]! < 48 ? ch[0]! : ch[0]! - 12
+    if (voice.startsWith('keys.')) {
+      for (const s of [0, 8]) for (const m of [root, ...ch.slice(1, 4)]) notes.push(n(layer, voice, m, s, 7.5, s ? 0.5 : 0.62))
+      for (const [s, len, m, vel] of i % 2 ? MELODY_B : MELODY) notes.push(n(layer, voice, m + 5, s, len, vel))
+    } else if (voice === 'guitar.mute') {
+      for (let s = 0; s < 16; s += 2) for (const m of [root + 12, root + 19]) notes.push(n(layer, voice, m, s, 1, s % 4 === 0 ? 0.9 : 0.65))
+    } else if (voice.startsWith('guitar.')) {
+      // Strums: down on 0, 6, 12, up on 8 and 14; strings about 12 ms apart.
+      const shape = [root + 12, ...ch.slice(1)].sort((a, b) => a - b)
+      for (const [s, down, vel, len] of [[0, 1, 0.85, 6], [6, 1, 0.6, 2], [8, 0, 0.55, 4], [12, 1, 0.75, 2], [14, 0, 0.5, 2]] as const) {
+        const order = down ? shape : [...shape].reverse().slice(0, 3)
+        order.forEach((m, k) => notes.push(n(layer, voice, m, s + k * 0.08, len - k * 0.08, vel * (1 - k * 0.04))))
+      }
+    } else {
+      const line: Array<[number, number, number, number]> = [[0, 3, 0, 0.9], [3, 1, 0, 0.35], [4, 2, 7, 0.7], [6, 2, 12, 0.6], [8, 3, 0, 0.85], [11, 1, 10, 0.4], [12, 2, 7, 0.7], [14, 2, 5, 0.65]]
+      for (const [s, len, iv, vel] of line) notes.push(n(layer, voice, root + iv, s, len, vel))
+    }
+    return { notes, mix: on(layer) }
+  })
+}
+
+/** Nothing scheduled, one layer open: for live() notes played from the harness. */
+export function silentLayer(layer: Layer, fx: Partial<FxState> = {}): ConductorLike {
+  return fake(() => ({ mix: on(layer), fx }))
 }
 
 export const HIT_ORDER: DrumHit[] = ['k', 's', 'c', 'h', 'o', 'r', 'p', 't', 'm', 'T', 'x', 'z']

@@ -14,6 +14,9 @@
  * Levels: LEVEL[id] scales each patch so they sit at a similar loudness for
  * the same velocity (calibrated with tests/audio-harness). The mix balance
  * between layers lives in the player, not here.
+ *
+ * The played instruments (pianos, guitars, finger bass) render their notes
+ * in JS instead and live in instruments.ts; they are dispatched from here.
  */
 import type { VoiceId, NoteEvent } from '../types.ts'
 import {
@@ -21,12 +24,13 @@ import {
   begin, osc, noise, filter, gain, chain, envelope, finish, vibrato, stereo,
   hz, clamp, rand, velAmp, keyTrack, safeHz,
 } from './synth.ts'
+import { INSTRUMENTS, type InstrumentId } from './instruments.ts'
 
 type Opts = NoteEvent['opts']
 type Patch = (v: VoiceCtx, midi: number, at: number, dur: number, vel: number, opts: Opts, pan: number) => NoteHandle
 
 /** Per-voice loudness trim (linear). Calibrated from the harness level table. */
-const LEVEL: Record<VoiceId, number> = {
+const LEVEL: Record<Exclude<VoiceId, InstrumentId>, number> = {
   'lead.square': 0.0935, 'lead.saw': 0.0817, 'lead.pulse': 0.176, 'lead.ep': 0.119, 'lead.hollow': 0.0874,
   'lead.fm': 0.104, 'lead.glide': 0.0772, 'lead.whistle': 0.0865,
   'mallet.kalimba': 0.117, 'mallet.marimba': 0.125, 'pluck.harp': 0.0817,
@@ -774,6 +778,7 @@ const PATCHES: Record<VoiceId, Patch> = {
   'bell.glass': bellGlass, 'bell.fm': bellFm, 'bell.chime': bellChime,
   'counter.strings': counterStrings, 'counter.soft': counterSoft,
   'drone.sub': droneSub, 'drone.organ': droneOrgan, 'drone.shimmer': droneShimmer,
+  ...INSTRUMENTS,
 }
 
 export const VOICE_IDS = Object.keys(PATCHES) as VoiceId[]

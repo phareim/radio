@@ -109,6 +109,13 @@ export type VoiceId =
   | 'drone.sub'     // root and fifth, sine + soft triangle, very low
   | 'drone.organ'   // drawbar-ish root+fifth+octave, slow tremolo
   | 'drone.shimmer' // high overtone cluster, slow beating
+  // keys and strings (jam's instruments; any layer may use them)
+  | 'keys.piano'    // acoustic-ish piano: hammer thump, inharmonic partials, long decay
+  | 'keys.felt'     // felt piano: muted, soft attack, close and warm (lofi)
+  | 'guitar.nylon'  // plucked nylon string (Karplus-Strong), round and soft
+  | 'guitar.steel'  // plucked steel string, brighter, more ring
+  | 'guitar.mute'   // palm-muted pluck, short and percussive
+  | 'bass.finger'   // fingered electric bass (plucked string, warm low end)
 
 /** Drum kits: each maps the hit names below to a different synthesis. */
 export type KitId =
@@ -451,6 +458,8 @@ export interface BarPlan {
     intensity: number
     /** The next bar's first chord, for 'next chord' in the display. */
     nextChord?: string
+    /** A piece's position in its loop, 0-based (piece conductor only). */
+    loopBar?: number
   }
 }
 
@@ -507,6 +516,35 @@ export interface RadioPlayer {
    * <audio> element), so the music is not heard twice.
    */
   setOutput(mode: 'speakers' | 'stream'): void
+  /**
+   * Play a note now, outside the bar plans (an instrument under the
+   * player's fingers). Needs a started player; returns null otherwise. The
+   * note sounds on `layer`'s bus with that layer's effects sends.
+   */
+  live(layer: Layer, sound: LiveSound, vel: number, pan?: number): LiveNote | null
+  /**
+   * Where in the music an audio-clock time falls: the absolute bar index
+   * (BarPlan.index) and the fractional step 0..16 in it, or null before the
+   * first bar or past what is scheduled.
+   */
+  positionAt(time: number): { bar: number; step: number } | null
+  /** Seconds between scheduling a sound and hearing it (output + base latency), 0 when unknown. */
+  readonly latency: number
+}
+
+/** What a live note plays: a pitched voice or a drum hit. */
+export type LiveSound =
+  | { voice: VoiceId; midi: number }
+  | { kit: KitId; hit: DrumHit }
+
+export interface LiveNote {
+  /** Release a held note now (percussive sounds ring on regardless). */
+  release(): void
+}
+
+export interface PlayerOptions {
+  /** 'playback' (default: the radio, battery friendly) or 'interactive' (jam: low latency for live playing). */
+  latencyHint?: 'playback' | 'interactive'
 }
 
 // ---- feedback (backend) --------------------------------------------------

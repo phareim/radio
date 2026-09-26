@@ -14,6 +14,7 @@ const VOICES: Record<VoiceId, true> = {
   'bass.saw': true, 'bass.square': true, 'bass.round': true, 'bass.sub': true, 'bass.pluck': true, 'bass.fm': true,
   'bell.glass': true, 'bell.fm': true, 'bell.chime': true, 'counter.strings': true, 'counter.soft': true,
   'drone.sub': true, 'drone.organ': true, 'drone.shimmer': true,
+  'keys.piano': true, 'keys.felt': true, 'guitar.nylon': true, 'guitar.steel': true, 'guitar.mute': true, 'bass.finger': true,
 }
 export const VOICE_IDS = Object.keys(VOICES) as VoiceId[]
 

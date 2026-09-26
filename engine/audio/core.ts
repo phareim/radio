@@ -15,10 +15,14 @@
  *
  * Fades are scheduled one linear ramp per bar (see timing.ts `Fade`), so no
  * automation that is already sounding ever has to be cancelled.
+ *
+ * Live notes (`live()`, an instrument under the player's fingers) play on
+ * the same buses 5 ms after the call, with a 30 s nominal length that the
+ * returned handle's release() cuts short.
  */
-import type { BarPlan, ConductorLike, Layer, VisualState, NoteEvent, DrumEvent } from '../types.ts'
+import type { BarPlan, ConductorLike, Layer, VisualState, NoteEvent, DrumEvent, LiveSound, LiveNote } from '../types.ts'
 import { LAYERS } from '../types.ts'
-import { barTiming, type BarTiming, type Fade, fadeAtBarStart, fadeAtBarEnd } from './timing.ts'
+import { barTiming, type BarTiming, type Fade, type PlacedBar, fadeAtBarStart, fadeAtBarEnd, positionIn } from './timing.ts'
 import { createResources, type Resources, type VoiceCtx, type NoteHandle, clamp } from './synth.ts'
 import { createFx, type Fx } from './fx.ts'
 import { playVoice } from './voices.ts'
@@ -75,6 +79,10 @@ export interface Core {
   /** Bars that have started sounding by `now` and were not reported yet. */
   due(now: number): BarPlan[]
   visual(now: number): Omit<VisualState, 'playing'>
+  /** Play a note now on `layer`'s bus (see RadioPlayer.live). */
+  live(layer: Layer, sound: LiveSound, vel: number, pan?: number): LiveNote
+  /** The bar and musical step at audio time `time`, or null outside the scheduled bars. */
+  positionAt(time: number): { bar: number; step: number } | null
   /** Audio time the first bar started (or -1). */
   readonly startTime: number
   /** Internal queue lengths, for leak checks. */
@@ -114,6 +122,8 @@ export function createCore(ac: BaseAudioContext, conductor: ConductorLike): Core
   let nextStart = -1
   let startTime = -1
   const bars: ScheduledBar[] = []
+  /** Timing of the recent and scheduled bars, kept a few seconds longer than `bars` for positionAt. */
+  const placed: PlacedBar[] = []
   const pending: Pending[] = []
   let pendingAt = 0
   const sounding: Sounding[] = []
@@ -165,7 +175,10 @@ export function createCore(ac: BaseAudioContext, conductor: ConductorLike): Core
     const b = buses[e.layer] ?? buses.drums
     playDrum(b.vc, e.kit, e.hit, t, e.vel, len)
     if (e.hit === 'k' && e.layer === 'drums') {
-      kicks.push(t)
+      // Sorted: a live kick can land before kicks already scheduled.
+      let i = kicks.length
+      while (i > 0 && kicks[i - 1]! > t) i--
+      kicks.splice(i, 0, t)
       // The pump: duck pads and drones on the kick, recover over about a quarter of a beat.
       const drumsLevel = b.ramp[3]
       const depth = clamp(pumpDepth * drumsLevel, 0, 1) * 0.6
@@ -209,6 +222,7 @@ export function createCore(ac: BaseAudioContext, conductor: ConductorLike): Core
     for (const ev of evs) pending.push(ev)
     sounding.sort((a, b) => a.t - b.t)
     bars.push({ plan, t0, t1, tm, fired: false })
+    placed.push({ index: plan.index, t0, t1, tm })
     return t1
   }
 
@@ -250,6 +264,7 @@ export function createCore(ac: BaseAudioContext, conductor: ConductorLike): Core
     while (k < kicks.length && kicks[k]! < old) k++
     if (k > 0) kicks.splice(0, k)
     while (bars.length > 2 && bars[1]!.t0 <= now && bars[0]!.fired && bars[1]!.fired) bars.shift()
+    while (placed.length > 1 && placed[0]!.t1 < now - 8) placed.shift()
     if (ties.size > 64) for (const [key, h] of ties) if (h.end < now - 1) ties.delete(key)
   }
 
@@ -319,14 +334,66 @@ export function createCore(ac: BaseAudioContext, conductor: ConductorLike): Core
     }
   }
 
+  // ---- live notes ---------------------------------------------------------------------
+
+  const LIVE_DUR = 30
+
+  function live(layer: Layer, sound: LiveSound, vel: number, pan?: number): LiveNote {
+    const t = ac.currentTime + 0.005
+    const b = buses[layer] ?? buses.lead
+    const v = clamp(Number.isFinite(vel) ? vel : 0.7, 0, 1)
+    if ('kit' in sound) {
+      const l = b.vc.layer
+      // Drums and perc as scheduled hits (the kick pumps and drives the beat); any other layer just plays it.
+      if (l === 'drums' || l === 'perc') drumEvent({ layer: l, kit: sound.kit, hit: sound.hit, step: 0, vel: v }, t, beatLen)
+      else playDrum(b.vc, sound.kit, sound.hit, t, v, beatLen)
+      insertHit({ layer: l, t, vel: v })
+      return { release() {} }
+    }
+    const p = pan ?? DEFAULT_PAN[b.vc.layer] ?? 0
+    // Legato for the mono glide lead: it slides only while the previous live note is still held.
+    const h = playVoice(b.vc, sound.voice, sound.midi, t, LIVE_DUR, v, { legato: true }, p)
+    const s: Sounding = { layer: b.vc.layer, midi: sound.midi, t, end: t + LIVE_DUR, vel: v }
+    insertSounding(s)
+    let done = false
+    return {
+      release() {
+        if (done) return
+        done = true
+        const r = ac.currentTime
+        h?.release(r)
+        if (s.end > r) s.end = r
+        const g = b.vc.glide
+        if (g && g.midi === sound.midi && g.end > r) g.end = r
+      },
+    }
+  }
+
+  function insertSounding(s: Sounding): void {
+    let i = sounding.length
+    while (i > 0 && sounding[i - 1]!.t > s.t) i--
+    sounding.splice(i, 0, s)
+  }
+
+  function insertHit(h: { layer: Layer; t: number; vel: number }): void {
+    let i = hits.length
+    while (i > 0 && hits[i - 1]!.t > h.t) i--
+    hits.splice(i, 0, h)
+  }
+
   return {
     res,
     fx,
+    live,
+    positionAt: (time: number) => positionIn(placed, time),
     output: fx.output,
     tick,
     due,
     visual,
     get startTime() { return startTime },
-    sizes: () => ({ bars: bars.length, pending: pending.length - pendingAt, sounding: sounding.length, hits: hits.length, kicks: kicks.length, ties: ties.size }),
+    sizes: () => ({
+      bars: bars.length, placed: placed.length, pending: pending.length - pendingAt, sounding: sounding.length,
+      hits: hits.length, kicks: kicks.length, ties: ties.size, bufs: res.bufs.size,
+    }),
   }
 }
