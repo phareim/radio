@@ -8,6 +8,8 @@ import { loadEngine } from './engine.mjs';
 import { composeLandscape } from '../compose.mjs';
 import { startPaint } from '../paint.mjs';
 import { runReview } from '../review.mjs';
+import { jamTrack, jamFeel, jamChannel } from '../jam.mjs';
+import { jamRoutes } from './jam.mjs';
 
 const MAX_BODY = 256 * 1024;
 const startedAt = Date.now();
@@ -55,7 +57,7 @@ function corsHeaders(req, origins) {
   if (!ok) return {};
   return {
     'access-control-allow-origin': origin,
-    'access-control-allow-methods': 'GET, POST, PATCH, DELETE, OPTIONS',
+    'access-control-allow-methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
     'access-control-allow-headers': 'authorization, content-type, x-radio-user',
     'access-control-max-age': '600',
     vary: 'Origin',
@@ -93,6 +95,12 @@ export function createApp({ db, apiKey, corsOrigins = [], ask, paint = startPain
       return { ...res, painting: paint(db, res.landscape, input.owner ?? null) };
     },
     review: () => runReview({ db, ask }),
+    'jam-track': (input) => jamTrack({ ...input, ask }),
+    'jam-feel': (input) => jamFeel({ ...input, ask }),
+    'jam-channel': async (input) => {
+      const res = await jamChannel({ db, piece: input.piece, owner: input.owner ?? null, ask });
+      return { ...res, painting: paint(db, res.landscape, input.owner ?? null) };
+    },
   });
 
   const routes = [
@@ -199,6 +207,8 @@ export function createApp({ db, apiKey, corsOrigins = [], ask, paint = startPain
         })),
       };
     }],
+
+    ...jamRoutes({ db, jobs, HttpError, readJson, needListener }),
 
     ['GET', /^\/jobs\/(\d+)$/, async (_req, [, id]) => {
       const job = jobs.get(Number(id));

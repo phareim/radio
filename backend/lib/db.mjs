@@ -1,8 +1,18 @@
-// SQLite store (node:sqlite). One file, five tables.
+// SQLite store (node:sqlite). One file, seven tables.
 
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
+
+const JOBS_COLUMNS = `
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  kind TEXT NOT NULL,
+  status TEXT NOT NULL,
+  input TEXT,
+  result TEXT,
+  error TEXT,
+  created_at TEXT NOT NULL,
+  finished_at TEXT`;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS feedback (
@@ -26,15 +36,10 @@ CREATE TABLE IF NOT EXISTS landscapes (
   hidden INTEGER NOT NULL DEFAULT 0
 );
 
+-- kind: compose, review, jam-track, jam-feel, jam-channel (lib/jobs.mjs
+-- refuses kinds without a handler).
 CREATE TABLE IF NOT EXISTS jobs (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  kind TEXT NOT NULL CHECK (kind IN ('compose', 'review')),
-  status TEXT NOT NULL,
-  input TEXT,
-  result TEXT,
-  error TEXT,
-  created_at TEXT NOT NULL,
-  finished_at TEXT
+${JOBS_COLUMNS}
 );
 
 -- Per-listener settings (which channels show on the dial), keyed by the
@@ -53,6 +58,30 @@ CREATE TABLE IF NOT EXISTS reviews (
   path TEXT NOT NULL,
   summary TEXT NOT NULL DEFAULT ''
 );
+
+-- jam's saved pieces (engine/piece/types.ts Piece as JSON), per member.
+-- Deleting one sets hidden = 1; saving it again brings it back.
+CREATE TABLE IF NOT EXISTS jam_pieces (
+  owner TEXT NOT NULL,
+  id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  json TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  hidden INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (owner, id)
+);
+
+-- jam's snippets: a member's saved bars (a partial Track) for the library.
+CREATE TABLE IF NOT EXISTS jam_snippets (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  owner TEXT NOT NULL,
+  name TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  json TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS jam_snippets_owner ON jam_snippets (owner);
 `;
 
 export function openDb(file) {
@@ -84,6 +113,31 @@ function migrate(db) {
   if (!cols('feedback').includes('user')) {
     db.exec('ALTER TABLE feedback ADD COLUMN user TEXT');
     db.prepare('UPDATE feedback SET user = ? WHERE user IS NULL').run(legacy);
+  }
+  freeJobKinds(db);
+}
+
+/**
+ * The first jobs table limited kind to compose/review with a CHECK, which
+ * SQLite cannot drop: copy the rows (same ids) into a table without it, in
+ * one transaction, and keep the AUTOINCREMENT counter where it was.
+ */
+function freeJobKinds(db) {
+  const sql = db.prepare(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'jobs'`).get()?.sql ?? '';
+  if (!/CHECK\s*\(\s*kind/i.test(sql)) return;
+  const seq = db.prepare(`SELECT seq FROM sqlite_sequence WHERE name = 'jobs'`).get()?.seq ?? 0;
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    db.exec(`DROP TABLE IF EXISTS jobs_free; CREATE TABLE jobs_free (${JOBS_COLUMNS}\n)`);
+    db.exec(`INSERT INTO jobs_free (id, kind, status, input, result, error, created_at, finished_at)
+             SELECT id, kind, status, input, result, error, created_at, finished_at FROM jobs`);
+    db.exec('DROP TABLE jobs; ALTER TABLE jobs_free RENAME TO jobs');
+    const kept = db.prepare(`UPDATE sqlite_sequence SET seq = MAX(seq, ?) WHERE name = 'jobs'`).run(seq);
+    if (kept.changes === 0 && seq > 0) db.prepare(`INSERT INTO sqlite_sequence (name, seq) VALUES ('jobs', ?)`).run(seq);
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
   }
 }
 

@@ -1,5 +1,6 @@
 // Compose a new landscape with Opus from Petter's request.
 // Prompt → JSON → force origin/id/prompt → validate → (one repair round) → store.
+// generateLandscape is that path for any first prompt; jam.mjs's channel uses it too.
 
 import { randomBytes } from 'node:crypto';
 import { loadEngine, landscapeSchema, validatorSource } from './lib/engine.mjs';
@@ -8,7 +9,7 @@ import { now } from './lib/db.mjs';
 
 const EXAMPLE_PREFERENCE = ['coast', 'neonrain', 'voyager', 'jungle', 'frostwood'];
 
-const INTENT = `The radio is Petter's generative background music for working: electronic,
+export const INTENT = `The radio is Petter's generative background music for working: electronic,
 semi-retro game soundtrack in the vein of Neon Shrine (his synthwave Zelda-like):
 detuned square and saw leads, pads, chip and synthwave drums, warm tape, places
 you could walk around in. It runs for hours in the background, so it must be
@@ -31,7 +32,7 @@ function pickExamples(LANDSCAPES, base) {
 
 const asJson = (o) => JSON.stringify(o, null, 1);
 
-function validatorPart() {
+export function validatorPart() {
   const src = validatorSource();
   return src ? [`## The validator (engine/validate.ts): your JSON must pass it\n\n\`\`\`ts\n${src}\n\`\`\``] : [];
 }
@@ -128,19 +129,18 @@ function check(reply, { db, prompt, id, validateLandscape, LANDSCAPES, SCENES })
 }
 
 /**
- * Compose, validate (one repair round), store. Throws with the validator's
- * errors if the repaired landscape is still invalid.
+ * Ask Opus with `first`, validate (one repair round), store with `prompt`
+ * and `owner`. Throws with the validator's errors if the repaired
+ * landscape is still invalid. Returns { landscape, repaired }.
  */
-export async function composeLandscape({ db, prompt, base, owner = null, ask = askOpus }) {
+export async function generateLandscape({ db, first, prompt, owner = null, ask = askOpus, label = 'compose' }) {
   const { validateLandscape, LANDSCAPES, SCENES } = await loadEngine();
-  if (base && !LANDSCAPES[base]) throw new Error(`unknown base landscape ${base}`);
   const ctx = { db, prompt, validateLandscape, LANDSCAPES, SCENES };
 
-  const first = await ask(buildComposePrompt({ prompt, base, LANDSCAPES, SCENES }));
-  let res = check(first, ctx);
+  let res = check(await ask(first), ctx);
   let repaired = false;
   if (!res.ok) {
-    console.log(`[radio-api] compose: ${res.errors.length} validation errors, asking for a repair`);
+    console.log(`[radio-api] ${label}: ${res.errors.length} validation errors, asking for a repair`);
     const second = await ask(buildRepairPrompt({ json: res.json, errors: res.errors, LANDSCAPES, SCENES }));
     res = check(second, { ...ctx, id: res.id });
     repaired = true;
@@ -151,4 +151,12 @@ export async function composeLandscape({ db, prompt, base, owner = null, ask = a
   db.prepare('INSERT INTO landscapes (id, name, json, prompt, created_at, owner) VALUES (?, ?, ?, ?, ?, ?)')
     .run(l.id, String(l.name ?? l.id), JSON.stringify(l), prompt, now(), owner);
   return { landscape: l, repaired };
+}
+
+/** Compose from Petter's request (optionally a variation on a built-in), then generateLandscape. */
+export async function composeLandscape({ db, prompt, base, owner = null, ask = askOpus }) {
+  const { LANDSCAPES, SCENES } = await loadEngine();
+  if (base && !LANDSCAPES[base]) throw new Error(`unknown base landscape ${base}`);
+  const first = buildComposePrompt({ prompt, base, LANDSCAPES, SCENES });
+  return generateLandscape({ db, first, prompt, owner, ask });
 }
