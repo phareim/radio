@@ -104,8 +104,8 @@ function freshId(db, name, LANDSCAPES) {
   }
 }
 
-/** Parse, stamp and validate one reply. Returns { ok, errors, landscape, json }. */
-function check(reply, { db, prompt, id, validateLandscape, LANDSCAPES, SCENES }) {
+/** Parse, fix (when given), stamp and validate one reply. Returns { ok, errors, landscape, json }. */
+function check(reply, { db, prompt, id, validateLandscape, LANDSCAPES, SCENES, fix }) {
   let obj;
   try {
     obj = parseJsonObject(reply);
@@ -115,6 +115,7 @@ function check(reply, { db, prompt, id, validateLandscape, LANDSCAPES, SCENES })
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) {
     return { ok: false, errors: ['the reply is not a JSON object'], json: reply };
   }
+  if (fix) obj = fix(obj);
   const stamped = { ...obj, id: id ?? freshId(db, obj.name, LANDSCAPES), origin: 'opus', prompt };
   const json = JSON.stringify(stamped, null, 1);
   const res = validateLandscape(stamped);
@@ -130,12 +131,14 @@ function check(reply, { db, prompt, id, validateLandscape, LANDSCAPES, SCENES })
 
 /**
  * Ask Opus with `first`, validate (one repair round), store with `prompt`
- * and `owner`. Throws with the validator's errors if the repaired
- * landscape is still invalid. Returns { landscape, repaired }.
+ * and `owner`. `fix(obj)`, when given, rewrites each parsed reply before it
+ * is stamped and validated (jam-channel puts the piece's written phrases
+ * back). Throws with the validator's errors if the repaired landscape is
+ * still invalid. Returns { landscape, repaired }.
  */
-export async function generateLandscape({ db, first, prompt, owner = null, ask = askOpus, label = 'compose' }) {
+export async function generateLandscape({ db, first, prompt, owner = null, ask = askOpus, label = 'compose', fix = null }) {
   const { validateLandscape, LANDSCAPES, SCENES } = await loadEngine();
-  const ctx = { db, prompt, validateLandscape, LANDSCAPES, SCENES };
+  const ctx = { db, prompt, validateLandscape, LANDSCAPES, SCENES, fix };
 
   let res = check(await ask(first), ctx);
   let repaired = false;

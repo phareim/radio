@@ -35,7 +35,7 @@ let pieceCached = null;
 /**
  * loadEngine() plus jam's piece module (engine/piece/index.ts) and the id
  * lists from catalog.ts: { validatePiece, pieceToLandscape, phraseSpans,
- * parseNoteBar, parseDrumBar, VOICE_IDS, KIT_IDS, TRACK_LAYERS, ... }.
+ * parseNoteBar, parseDrumBar, modeFor, VOICE_IDS, KIT_IDS, TRACK_LAYERS, ... }.
  * Separate from loadEngine so the radio's own routes never depend on the
  * piece module loading.
  */
@@ -46,8 +46,12 @@ export async function loadPieceEngine() {
   const catalogFile = join(base.dir, 'catalog.ts');
   const catalog = existsSync(catalogFile) ? await import(pathToFileURL(catalogFile).href) : {};
   const list = (k) => [...(catalog[k] ?? piece[k] ?? [])];
+  const conductorFile = join(base.dir, 'conductor.ts');
+  const conductor = existsSync(conductorFile) ? await import(pathToFileURL(conductorFile).href) : {};
   pieceCached = {
     ...base,
+    /** The mode a landscape plays at a mood (written phrases are in its mode at 0.5). */
+    modeFor: conductor.modeFor,
     validatePiece: piece.validatePiece,
     pieceToLandscape: piece.pieceToLandscape,
     phraseSpans: piece.phraseSpans,

@@ -14,6 +14,10 @@
  * - Left alone, the music has form: sections A, A2, B, A over the
  *   landscape's progressions, and now and then a phrase where the drums and
  *   lead step out to breathe.
+ * - A landscape with written phrases (made in jam) quotes one now and then:
+ *   a section W that plays the phrase over its own chords for eight bars,
+ *   its parts in place of the composer on their layers, then the cycle goes
+ *   on where it was.
  */
 import type {
   BarPlan, Chord, ChordSpan, ConductorLike, Controls, FxSpec, FxState, Key, Landscape, Layer, LayerMix,
@@ -26,6 +30,8 @@ import { keyName, parseProgression, parseToken, scalePcs, MODE_STEPS } from './t
 import type { ParsedToken } from './theory.ts'
 import { composeBar, makeMotif, newMemory, varyMotif } from './composer.ts'
 import type { Motif } from './composer.ts'
+import { DEFAULT_QUOTE, preparedWritten, WRITTEN_BARS, writtenBar, writtenSpans } from './written.ts'
+import type { PreparedPhrase } from './written.ts'
 
 export interface ConductorOptions {
   /** Find a landscape by id (built-in or composed). */
@@ -45,7 +51,7 @@ const ENTRY_ORDER: Layer[] = ['drone', 'pad', 'bass', 'perc', 'drums', 'arp', 'b
 const SOFT: ReadonlySet<Layer> = new Set<Layer>(['pad', 'drone', 'bells', 'counter', 'ambience'])
 
 interface Section {
-  name: 'A' | 'A2' | 'B'
+  name: 'A' | 'A2' | 'B' | 'W'
   startBar: number
   prog: Progression
   seed: number
@@ -53,6 +59,9 @@ interface Section {
   motifB: Motif
   phrases: number
   phrasesDone: number
+  /** W: the written phrase it quotes, and the section that was due when it came in (it follows). */
+  written?: PreparedPhrase
+  resume?: 'A' | 'A2' | 'B'
 }
 
 interface Scheduled { bar: number; layer: Layer; on: boolean }
@@ -171,6 +180,8 @@ export function createConductor(opts: ConductorOptions): Conductor {
   let settleUntil = 0
   /** The pattern level the parts play at (bass pattern, groove, arp rate). */
   let groove = 0
+  /** Index of the written phrase quoted last (not quoted twice running when there are others). */
+  let lastQuote = -1
 
   // ---- sections ------------------------------------------------------------
 
@@ -209,12 +220,41 @@ export function createConductor(opts: ConductorOptions): Conductor {
     return { name, startBar, prog, seed: sseed, motif, motifB, phrases, phrasesDone: 0 }
   }
 
-  function nextSectionName(prev: Section['name']): Section['name'] {
+  function nextSectionName(prev: Section['name']): 'A' | 'A2' | 'B' {
     return prev === 'A' ? 'A2' : prev === 'A2' ? 'B' : 'A'
+  }
+
+  /**
+   * Now and then (Landscape.quote) a section that is due becomes W: one
+   * written phrase (by weight, not the last one when there are others),
+   * eight bars long. Not during a landscape move or while a new place builds
+   * up, not into a breath, never two in a row; `due` follows it.
+   */
+  function quoteSection(due: 'A' | 'A2' | 'B', startBar: number): Section | null {
+    const phrases = preparedWritten(L)
+    if (!phrases.length || move || building) return null
+    if (breath && startBar >= breath.start && startBar < breath.until) return null
+    const rng = createRng(hashSeed(seed, sectionCount * 7919 + 0x51c7))
+    if (!rng.chance(L.quote ?? DEFAULT_QUOTE)) return null
+    let pool = phrases.filter(p => p.index !== lastQuote)
+    if (!pool.length) pool = phrases
+    const pick = rng.weighted(pool, pool.map(p => p.phrase.weight ?? 1))
+    lastQuote = pick.index
+    sectionCount++
+    const sseed = hashSeed(seed, sectionCount * 7919)
+    const motifB = varyMotif(theme, L, createRng(sseed).fork(3), density)
+    const phrases8 = Math.max(1, Math.round(WRITTEN_BARS / phraseBars))
+    return { name: 'W', startBar, prog: homeProg, seed: sseed, motif: theme, motifB, phrases: phrases8, phrasesDone: 0, written: pick, resume: due }
+  }
+
+  /** The display name of a section: W sections carry their phrase's name. */
+  function sectionLabel(sec: Section): string {
+    return sec.written?.phrase.name ? `W:${sec.written.phrase.name}` : sec.name
   }
 
   /** Chord spans of one bar from the section's progression. */
   function sectionHarmony(sec: Section, b: number, k: Key): ChordSpan[] {
+    if (sec.written) return writtenSpans(sec.written.phrase, k, b - sec.startBar)
     const colourRng = createRng(hashSeed(sec.seed, 0xc0))
     const colours = Array.from({ length: 32 }, () => ({
       extra7: colourRng.chance(L.color),
@@ -444,7 +484,8 @@ export function createConductor(opts: ConductorOptions): Conductor {
       if (!building || b !== building.startBar) {
         section.phrasesDone++
         if (section.phrasesDone >= section.phrases && !controls.hold) {
-          section = newSection(nextSectionName(section.name), b)
+          const due = section.resume ?? nextSectionName(section.name)
+          section = (section.written ? null : quoteSection(due, b)) ?? newSection(due, b)
           sectionStart = true
         }
       }
@@ -545,6 +586,16 @@ export function createConductor(opts: ConductorOptions): Conductor {
       mem,
       mood: controls.mood,
     })
+    let notes = composed.notes
+    let drumHits = composed.drums
+
+    // A quote: the written parts that sound replace the composer on their layers.
+    const quoting = !inBridge && section.written ? section.written : null
+    if (quoting) {
+      const w = writtenBar(quoting, b - section.startBar, level, present, { tonic: L.tonic, mode: modeFor(L, 0.5) }, barKey, spans)
+      notes = [...notes.filter(n => !quoting.layers.has(n.layer)), ...w.notes]
+      drumHits = [...drumHits.filter(d => !quoting.layers.has(d.layer)), ...w.drums]
+    }
 
     // Mix: entering layers swell or start on the beat; leaving ones die away.
     const mix: BarPlan['mix'] = {}
@@ -602,6 +653,8 @@ export function createConductor(opts: ConductorOptions): Conductor {
       }
     } else if (modeNote && modeNote.until > b) {
       transition = { kind: 'mood', from: L.id, to: L.id, progress: 1, note: modeNote.text }
+    } else if (quoting) {
+      transition = { kind: 'none', from: L.id, to: L.id, progress: 1, note: `quoting ${quoting.phrase.name || 'a written phrase'}` }
     }
     if (building && !upcoming.length && b - building.startBar >= 2) building = null
 
@@ -614,8 +667,8 @@ export function createConductor(opts: ConductorOptions): Conductor {
       chords: spans,
       key: barKey,
       scale,
-      notes: composed.notes,
-      drums: composed.drums,
+      notes,
+      drums: drumHits,
       mix,
       fx,
       ambience,
@@ -625,7 +678,7 @@ export function createConductor(opts: ConductorOptions): Conductor {
         scene,
         phraseBar: inBridge ? bridgeBar : phraseBar,
         phraseBars: inBridge ? 4 : phraseBars,
-        section: inBridge ? 'bridge' : section.name,
+        section: inBridge ? 'bridge' : sectionLabel(section),
         active: LAYERS.filter(l => present.has(l)),
         upcoming,
         transition,

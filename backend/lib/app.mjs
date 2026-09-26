@@ -98,7 +98,7 @@ export function createApp({ db, apiKey, corsOrigins = [], ask, paint = startPain
     'jam-track': (input) => jamTrack({ ...input, ask }),
     'jam-feel': (input) => jamFeel({ ...input, ask }),
     'jam-channel': async (input) => {
-      const res = await jamChannel({ db, piece: input.piece, owner: input.owner ?? null, ask });
+      const res = await jamChannel({ db, piece: input.piece, owner: input.owner ?? null, written: input.written ?? true, ask });
       return { ...res, painting: paint(db, res.landscape, input.owner ?? null) };
     },
   });

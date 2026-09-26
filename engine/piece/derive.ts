@@ -3,11 +3,14 @@
  * progressions, its bass line (as a pattern of chord functions), its
  * grooves per intensity, its lead's opening phrases (as written motifs) and
  * its voices and ladder carry over; the base landscape fills in the rest.
- * The result always passes validateLandscape, so it is a starting draft for
- * a channel and the landscape growing composes with.
+ * Its phrases themselves come along note for note as `written` phrases,
+ * which the radio's conductor quotes now and then. The result always passes
+ * validateLandscape, so it is a starting draft for a channel and the
+ * landscape growing composes with.
  */
 import type {
   ArpSpec, BassSpec, DrumSpec, Groove, Key, KitId, Landscape, Layer, MelodySpec, Progression, VoiceId,
+  WrittenPart, WrittenPhrase,
 } from '../types.ts'
 import { LAYERS } from '../types.ts'
 import { BRIGHTNESS, scalePcs, scaleTonesIn } from '../theory.ts'
@@ -18,6 +21,8 @@ import { PIECE_PHRASE_BARS } from './types.ts'
 import { formatDrumBar } from './notation.ts'
 import { chordAt } from './chords.ts'
 import { grooveOf, NEUTRAL_FX, notesOf } from './conductor.ts'
+import { DEFAULT_QUOTE } from '../written.ts'
+import { MAX_WRITTEN_PARTS } from '../validate.ts'
 
 type Five<T> = [T, T, T, T, T]
 const LEVELS = [0, 1, 2, 3, 4] as const
@@ -165,13 +170,46 @@ export function motifFromNotes(notes: PieceNote[][], key: Key): string {
   return out.join(' | ')
 }
 
+/**
+ * The piece's phrases as written phrases: per phrase its progression and
+ * one part per track that is not muted (solo is ignored) and has notes
+ * somewhere in the loop, named P1, P2, ... A track silent in a phrase keeps
+ * its (empty) part there, so a quote keeps the piece's silences on that
+ * layer. Phrases where nothing plays are left out. At most 10 parts a
+ * phrase: those that play in it first, then by entry level.
+ */
+export function writtenPhrases(piece: Piece): WrittenPhrase[] {
+  const tracks = piece.tracks.filter(t => !t.mute && t.bars.some(b => b.trim()))
+  const out: WrittenPhrase[] = []
+  for (let p = 0; p < piece.phrases; p++) {
+    const parts = tracks.map((t, i) => {
+      const part: WrittenPart = { layer: t.layer, enter: t.enter, bars: t.bars.slice(p * PIECE_PHRASE_BARS, (p + 1) * PIECE_PHRASE_BARS) }
+      if (t.voice) part.voice = t.voice
+      if (t.kit) part.kit = t.kit
+      if (t.gain !== undefined && t.gain !== 1) part.gain = t.gain
+      return { part, i, plays: part.bars.some(b => b.trim()) }
+    })
+    if (!parts.some(x => x.plays)) continue
+    const kept = [...parts]
+      .sort((a, b) => Number(b.plays) - Number(a.plays) || a.part.enter - b.part.enter || a.i - b.i)
+      .slice(0, MAX_WRITTEN_PARTS)
+      .sort((a, b) => a.i - b.i)
+    out.push({ name: `P${p + 1}`, chords: piece.chords[p]!, chordBars: piece.chordBars ?? 2, parts: kept.map(x => x.part) })
+  }
+  return out
+}
+
 function slug(id: string): string {
   const s = id.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+/, '').slice(0, 37)
   return `jam-${s || 'piece'}`
 }
 
-/** A draft Landscape from a piece, filled in from `base`; passes validateLandscape. */
-export function pieceToLandscape(piece: Piece, base?: Landscape): Landscape {
+/**
+ * A draft Landscape from a piece, filled in from `base`; passes
+ * validateLandscape. With `written` (default true) it carries the piece's
+ * phrases as written phrases and `quote` 0.35.
+ */
+export function pieceToLandscape(piece: Piece, base?: Landscape, opts: { written?: boolean } = {}): Landscape {
   const live = piece.tracks.filter(t => !t.mute)
   const covered = new Set(piece.tracks.map(t => t.layer))
   const noteTrack = (l: Layer) => live.find(t => t.layer === l && t.voice)
@@ -269,6 +307,11 @@ export function pieceToLandscape(piece: Piece, base?: Landscape): Landscape {
       lead.range = [lo, hi]
     }
     L.lead = lead
+  }
+
+  if (opts.written ?? true) {
+    const written = writtenPhrases(piece)
+    if (written.length) { L.written = written; L.quote = DEFAULT_QUOTE }
   }
   return L
 }

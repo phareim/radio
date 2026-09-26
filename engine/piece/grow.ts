@@ -148,7 +148,7 @@ function grow(piece: Piece, layer: Layer, level: Level, enter: Level, L: Landsca
  */
 export function growLayer(piece: Piece, layer: Layer, level: Level, opts: GrowOptions): Track {
   const base = piece.base ? opts.lookup(piece.base) : undefined
-  let L = pieceToLandscape(piece, base)
+  let L = pieceToLandscape(piece, base, { written: false })
   const from = opts.from ? opts.lookup(opts.from) : undefined
   if (from) L = borrow(L, from, layer)
   const seed = hashSeed(opts.seed ?? stringSeed(piece.id), LAYERS.indexOf(layer) + 1)
@@ -164,7 +164,7 @@ export function growLayer(piece: Piece, layer: Layer, level: Level, opts: GrowOp
 export function growLadder(piece: Piece, opts: { lookup: GrowOptions['lookup']; seed?: number }): Track[] {
   const ladder = opts.lookup(piece.base ?? 'coast') ?? opts.lookup('coast')
   if (!ladder) return []
-  const L = pieceToLandscape(piece, ladder)
+  const L = pieceToLandscape(piece, ladder, { written: false })
   const covered = new Set<Layer>(piece.tracks.map(t => t.layer))
   const out: Track[] = []
   let acc = piece

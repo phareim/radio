@@ -6,12 +6,12 @@
  * nothing ahead, so edits (setPiece) and intensity land on the next bar.
  */
 import type {
-  BarPlan, ConductorLike, Controls, DrumEvent, DrumHit, FxSpec, Groove, KitId, Landscape, Layer, NoteEvent,
+  BarPlan, ConductorLike, Controls, DrumEvent, FxSpec, Groove, Landscape, Layer, NoteEvent,
 } from '../types.ts'
 import { DEFAULT_CONTROLS, LAYERS } from '../types.ts'
 import { scalePcs } from '../theory.ts'
 import { shapeFx, thinAmbience } from '../conductor.ts'
-import { PAN } from '../composer.ts'
+import { grooveHits, noteEvents } from '../written.ts'
 import type { Piece, PieceNote, Track } from './types.ts'
 import { PIECE_PHRASE_BARS } from './types.ts'
 import { parseDrumBar, parseNoteBar } from './notation.ts'
@@ -39,7 +39,6 @@ export interface PieceConductor extends ConductorLike {
 /** Effects when a piece has no base landscape. */
 export const NEUTRAL_FX: FxSpec = { reverb: 0.3, delay: 0.2, reverbSize: 3, tone: 0.8, grit: 0.15, pump: 0 }
 
-const DRUM_VEL: Record<string, number> = { X: 1, x: 0.8, g: 0.35 }
 const CACHE_MAX = 2000
 const noteCache = new Map<string, PieceNote[]>()
 const drumCache = new Map<string, Groove>()
@@ -68,26 +67,8 @@ export function grooveOf(bar: string): Groove {
   return g
 }
 
-/** Drum events of a groove row by row: X 1.0, x 0.8, g 0.35; a riser lasts its '-' run. */
-export function grooveHits(g: Groove, layer: 'drums' | 'perc', kit: KitId, gain = 1): DrumEvent[] {
-  const out: DrumEvent[] = []
-  for (const [hit, row] of Object.entries(g)) {
-    if (!row) continue
-    for (let s = 0; s < 16; s++) {
-      const ch = row[s]!
-      const v = DRUM_VEL[ch]
-      if (v === undefined) continue
-      const ev: DrumEvent = { layer, kit, hit: hit as DrumHit, step: s, vel: Math.min(1, v * gain) }
-      if (hit === 'z') {
-        let len = 1
-        while (s + len < 16 && row[s + len] === '-') len++
-        ev.len = len
-      }
-      out.push(ev)
-    }
-  }
-  return out
-}
+/** Drum events of a groove, X 1.0, x 0.8, g 0.35 (shared with the radio conductor's quotes in ../written.ts). */
+export { grooveHits }
 
 /** The tracks sounding at an intensity: entered, not muted, and soloed when any track is. */
 export function soundingTracks(piece: Piece, intensity: number): Track[] {
@@ -133,18 +114,7 @@ export function createPieceConductor(opts: PieceConductorOptions): PieceConducto
       } else if (t.voice) {
         const ns = notesOf(src)
         if (ns.length) active.add(t.layer)
-        const glide = t.voice === 'lead.glide'
-        let prevStart = -1
-        let prevEnd = -1
-        for (const x of ns) {
-          const ev: NoteEvent = { layer: t.layer, voice: t.voice, midi: x.midi, step: x.step, len: x.len, vel: Math.min(1, x.vel * gain) }
-          const pan = PAN[t.layer]
-          if (pan !== undefined) ev.pan = pan
-          if (glide && prevStart < x.step && prevEnd >= x.step) ev.opts = { legato: true }
-          prevStart = x.step
-          prevEnd = Math.max(prevEnd, x.step + x.len)
-          notes.push(ev)
-        }
+        notes.push(...noteEvents(ns, t.layer, t.voice, gain))
       }
     }
     if (click) {

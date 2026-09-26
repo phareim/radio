@@ -11,7 +11,7 @@ bar notation are documented in `engine/piece/types.ts`.
 | `validate.ts` | `validatePiece`: every field, with messages that name track, bar and token (`tracks[2] 'keys' bar 5: bad pitch 'H4' in token '4:H4:2'`). Voice and kit ids come from `catalog.ts` |
 | `chords.ts` | `phraseSpans` (chord spans per loop bar, as written, no added colour), `chordAt`, `diatonicChords` for the chord chips |
 | `conductor.ts` | `createPieceConductor`: a `ConductorLike` for the radio's player. Plays the tracks at or below the intensity (mute, solo, gain), a click, and the base landscape's effects and ambience shaped as the radio shapes them (`shapeFx`, `thinAmbience` in `engine/conductor.ts`) |
-| `derive.ts` | `pieceToLandscape`: the piece as a radio Landscape over its base (bass line → pattern of chord functions, typical grooves per level, lead phrase openings → written motifs, voices, ladder). Always passes `validateLandscape` |
+| `derive.ts` | `pieceToLandscape`: the piece as a radio Landscape over its base (bass line → pattern of chord functions, typical grooves per level, lead phrase openings → written motifs, voices, ladder), and its phrases note for note as `written` phrases the radio quotes (`{ written: false }` leaves them out). Always passes `validateLandscape` |
 | `grow.ts` | `growLayer` / `growLadder`: the radio's composer writes a layer over the piece's chords and the result is written down as bars |
 | `library.ts` | `patternLibrary` (grooves, fills, bass/arp/lead/pad parts per landscape), `pieceFromLandscape`, `emptyPiece`, `INSTRUMENT_DEFAULTS` |
 
@@ -30,6 +30,14 @@ bar notation are documented in `engine/piece/types.ts`.
 - A drum track's groove in a derived landscape is its most common bar, so a
   crash or fill bar is not taken for the groove; the fill is the first
   phrase-end bar that differs from it.
+- A piece becomes a channel in two parts: `pieceToLandscape` distils it
+  into generative material, and `writtenPhrases` keeps each phrase as it
+  is (P1, P2, …: its progression and one part per track that is not muted
+  and has notes somewhere; solo is ignored; `quote` 0.35). A track silent
+  in a phrase keeps an empty part there, so the quote leaves that layer
+  silent too; a phrase where nothing plays is left out; more than ten
+  tracks keep those that play in the phrase, then the lowest entries. The
+  radio's conductor quotes them (docs/engine.md, Written phrases).
 - Grown notes keep the composer's velocities (rounded to 1..9) and lose its
   per-note pans and `arp.seq` cutoff sweep; the conductor pans by layer as the
   composer does.

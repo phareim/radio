@@ -14,6 +14,7 @@ engine/validate.ts     validateLandscape(): checks a Landscape (built-in or Opus
 engine/rng.ts          seeded RNG
 engine/composer.ts     writes bars: melody from motifs, bass, arp, drums, pads, bells
 engine/conductor.ts    ConductorLike: steers toward the Controls at musical boundaries
+engine/written.ts      written phrases (Landscape.written): parsing, pitch mapping, one bar of a quote
 engine/landscapes/     the built-in landscapes, one file each, index.ts lists them
 engine/audio/          the Web Audio side: player (scheduler), voices, drums, ambience, fx
 scene/                 the pixel-art window: one painted scene per landscape, dithered dissolves
@@ -44,6 +45,47 @@ where a musician would put them:
 
 The conductor plans lazily, one bar at a time, so a new control value
 re-plans from wherever the music is.
+
+## Written phrases
+
+A landscape may carry `written` phrases: eight bars written note for note
+in jam (the bar notation of `engine/piece/types.ts`), each with its own
+progression and up to ten parts (a layer, a voice or kit, an `enter`
+level). A channel made from a jam piece has one per phrase of the piece.
+The conductor quotes them now and then between its own sections:
+
+- **When**: where a section would start in the running form (not at the
+  very start, not on a landscape's arrival or while it builds up, not
+  while a move is pending, not into a breath, never twice in a row), with
+  chance `quote` (default 0.35, seeded like everything else) the section
+  becomes W: one written phrase, picked by `weight` and not the one quoted
+  last. It lasts eight bars (two phrases in a 4-bar landscape); then the
+  section that was due follows, so the A A2 B cycle goes on where it was.
+  `hold` freezes whatever section is playing, so a held quote loops and a
+  held generated section never quotes.
+- **What plays**: the phrase's chords as written (no added colour), in the
+  current mode. A part sounds when its layer is on (the ladder and the
+  layer entries decide, as for everything else) and its `enter` is at or
+  below the pattern level, which climbs and falls with the layers, so parts
+  come in with a build and play the phrase out when the intensity drops.
+  On a layer the phrase has a part for, the composer is silent for the
+  whole quote, also while that part waits for a higher level: the quote is
+  sparse where the piece is sparse. Layers without a part keep being
+  composed over the written chords (pad, arp, counter around a written
+  bass and lead). Drum parts play as written, without the composer's
+  fills and crash.
+- **Key**: parts are written in the landscape's tonic and its mode at mood
+  0.5. When the mood knob has moved the mode, each note that is a tone of
+  the chord sounding under it stays (notes over a written major V in minor
+  keep fitting it); other scale notes move by scale degree (D mixolydian's
+  C becomes C# in ionian); chromatic notes keep their pitch. A different
+  tonic would transpose first (it does not happen: quotes never play in a
+  bridge).
+- **Display**: `meta.section` is `W:<name>` (or `W`) and, when nothing
+  else is going on, `transition.note` says `quoting <name>`.
+
+A landscape without `written` plans exactly as before; a test pins main's
+output for the built-ins by hash.
 
 ## The player (engine/audio/)
 

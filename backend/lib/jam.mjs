@@ -153,7 +153,8 @@ export function jamRoutes({ db, jobs, HttpError, readJson, needListener }) {
       const owner = needListener(req);
       const b = await readJson(req);
       const piece = await validPiece(b.piece);
-      return [202, { job: jobs.enqueue('jam-channel', { piece, owner }) }];
+      if (b.written !== undefined && typeof b.written !== 'boolean') throw new HttpError(400, 'written: true or false');
+      return [202, { job: jobs.enqueue('jam-channel', { piece, owner, written: b.written ?? true }) }];
     }],
   ];
 }

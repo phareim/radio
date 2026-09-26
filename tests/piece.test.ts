@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { BUILTIN, LANDSCAPES } from '../engine/landscapes/index.ts'
 import { validateLandscape } from '../engine/validate.ts'
-import { modeFor } from '../engine/conductor.ts'
+import { createConductor, modeFor } from '../engine/conductor.ts'
 import { parseMotif } from '../engine/composer.ts'
 import type { BarPlan } from '../engine/types.ts'
 import {
@@ -279,6 +279,49 @@ test('a piece carries its bass line, grooves, motifs and ladder into the landsca
   assert.ok(L.layers[1].includes('arp'), 'the base brings in what the piece does not cover')
   assert.equal(L.id, 'jam-test')
   assert.equal(L.scene, 'coast')
+})
+
+test('a piece\'s phrases come along note for note as written phrases', () => {
+  const p = { ...jamPiece(), phrases: 2 as const, chords: ['1 6 4 5', '4 5 1:4'] }
+  p.tracks = p.tracks.map(t => ({ ...t, bars: [...t.bars, ...t.bars] }))
+  p.tracks[1]!.bars.fill('', 8)
+  p.tracks[2]!.solo = true
+  p.tracks.push(track({ id: 'muted', layer: 'lead', voice: 'lead.ep', mute: true, bars: Array(16).fill('0:A4:4') }))
+  p.tracks.push(track({ id: 'empty', layer: 'arp', voice: 'arp.warm', bars: Array(16).fill('') }))
+  const L = pieceToLandscape(p, LANDSCAPES.coast)
+  assert.deepEqual(validateLandscape(L).errors, [])
+  assert.equal(L.quote, 0.35)
+  assert.deepEqual(L.written!.map(w => [w.name, w.chords, w.chordBars]), [['P1', '1 6 4 5', 2], ['P2', '4 5 1:4', 2]])
+  const [p1, p2] = L.written!
+  assert.deepEqual(p1!.parts.map(x => [x.layer, x.voice ?? x.kit, x.enter, x.gain]), [['pad', 'pad.warm', 0, undefined], ['bass', 'bass.round', 1, 0.5], ['drums', 'kit.soft', 2, undefined]], 'muted and empty tracks left out, solo ignored')
+  assert.deepEqual(p1!.parts[0]!.bars, p.tracks[0]!.bars.slice(0, 8))
+  assert.deepEqual(p2!.parts[1]!.bars, Array(8).fill(''), 'a track silent in a phrase keeps the layer silent there')
+  assert.equal(pieceToLandscape(p, LANDSCAPES.coast, { written: false }).written, undefined)
+  assert.equal(pieceToLandscape(p, LANDSCAPES.coast, { written: false }).quote, undefined)
+  assert.equal(pieceToLandscape(emptyPiece()).written, undefined, 'nothing written, nothing to quote')
+  // More than ten tracks: the ones that play in the phrase first, then by entry.
+  const crowd = { ...emptyPiece({ id: 'crowd' }), phrases: 2 as const, chords: ['1 6 4 5', '4 5 1:4'] }
+  crowd.tracks = Array.from({ length: 12 }, (_, i) => track({ id: `t${i}`, layer: 'pad', voice: 'pad.warm', enter: (i % 5) as 0, bars: Array(16).fill('') }, 16))
+  crowd.tracks.forEach((t, i) => { t.bars[i < 11 ? 8 : 0] = '0:C4:4' })
+  const [c1, c2] = pieceToLandscape(crowd).written!
+  assert.deepEqual(validateLandscape(pieceToLandscape(crowd)).errors, [])
+  assert.equal(c1!.parts.length, 10)
+  assert.ok(c1!.parts.some(x => x.bars[0] === '0:C4:4'), 'P1: the one track playing there is kept')
+  assert.deepEqual(c2!.parts.map(x => x.enter), [0, 1, 2, 3, 4, 0, 1, 2, 3, 0], 'P2: of the eleven that play, the later of the two entering at 4 is dropped')
+})
+
+test('a channel made in jam quotes its phrases between the generated ones', () => {
+  const J = pieceToLandscape(pieceFromLandscape(LANDSCAPES.coast!, { lookup, seed: 1 }), LANDSCAPES.coast)
+  assert.deepEqual(validateLandscape(J).errors, [])
+  const c = createConductor({ lookup: id => (id === J.id ? J : LANDSCAPES[id]), seed: 42, controls: { landscape: J.id, intensity: 3 } })
+  const ps = Array.from({ length: 320 }, () => c.nextBar())
+  const quotes = ps.filter(p => p.meta.section.startsWith('W:') && p.meta.phraseBar === 0).map(p => p.meta.section)
+  assert.ok(quotes.length >= 2 && quotes.includes('W:P1') && quotes.includes('W:P2'), quotes.join(' '))
+  // In a quote at mood 0.5 the written bass line sounds exactly as the piece has it.
+  const bass = J.written![0]!.parts.find(x => x.layer === 'bass')!
+  const q = ps.find(p => p.meta.section === 'W:P1' && p.meta.active.includes('bass'))!
+  const wb = (q.index - ps.findIndex(p => p.meta.section === 'W:P1')) % 8
+  assert.deepEqual(q.notes.filter(n => n.layer === 'bass').map(n => n.midi), (parseNoteBar(bass.bars[wb]!) as { notes: Array<{ midi: number }> }).notes.map(n => n.midi))
 })
 
 test('motifFromNotes writes eighth-note degrees with octave marks', () => {

@@ -278,6 +278,49 @@ export interface FxSpec {
   pump?: number
 }
 
+/**
+ * One part of a written phrase: eight bars in jam's bar notation (see
+ * `engine/piece/types.ts`), one string per bar, '' for a silent bar.
+ *   note bars (`voice`): space-separated <step>:<pitches>:<len>[:<vel>],
+ *     step 0..15 in sixteenths, pitches like C4 or A3+C4+E4 (C4 = MIDI 60),
+ *     len in sixteenths, vel 1..9 (default 7). "0:A3+C4+E4:16 8:G4:4:5"
+ *   drum bars (`kit`, layer drums or perc): <hit>:<16 chars of . x X g ->,
+ *     "k:x.......x....... s:....X.......X..."
+ * Pitches are absolute, written in the landscape's tonic and the mode it
+ * has at mood 0.5; when the mood knob moves the mode, the conductor moves
+ * each note by scale degree (chromatic notes move with the degree below).
+ */
+export interface WrittenPart {
+  /** The layer it plays on (not ambience). It replaces the composer on that layer while quoted. */
+  layer: Layer
+  /** Exactly one of voice (note bars) and kit (drum bars; layer drums or perc). */
+  voice?: VoiceId
+  kit?: KitId
+  /** The part plays at this intensity and above (and only while `layer` is on the ladder). */
+  enter: 0 | 1 | 2 | 3 | 4
+  /** 0..1.5, scales velocity. Default 1. */
+  gain?: number
+  /** Exactly 8 bar strings. */
+  bars: string[]
+}
+
+/**
+ * A phrase written note for note (in jam, the radio's sister instrument),
+ * which the conductor quotes verbatim now and then between its own phrases.
+ */
+export interface WrittenPhrase {
+  /** Short label for the display, e.g. 'P1' or 'theme'. */
+  name?: string
+  /** The phrase's own progression (chord-token grammar, as Progression.chords); must last exactly 8 bars. */
+  chords: string
+  /** Default bars per chord token: 1 or 2 (default 2). */
+  chordBars?: 1 | 2
+  /** 1..10 parts. Layers without a part keep being composed over the phrase's chords. */
+  parts: WrittenPart[]
+  /** Relative pick weight (default 1). */
+  weight?: number
+}
+
 export interface Landscape {
   id: string
   name: string
@@ -319,6 +362,14 @@ export interface Landscape {
   ambience: Partial<Record<AmbienceId, number>>
   /** Accent colour for the UI (hex). */
   accent: string
+  /**
+   * Written phrases (at most 8) the conductor quotes between its generated
+   * sections: now and then a section becomes one of these, played for one
+   * 8-bar phrase over its own chords, then the music goes on generating.
+   */
+  written?: WrittenPhrase[]
+  /** 0..1: chance a new section quotes a written phrase (default 0.35). */
+  quote?: number
   /** Which painted scene shows it (a built-in landscape id); defaults to `id`. */
   scene?: string
   /** Where it came from: 'builtin' or 'opus' (composed on request). */

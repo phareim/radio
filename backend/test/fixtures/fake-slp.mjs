@@ -5,7 +5,9 @@
 // jam: track → a bass track (id 'bass', so it collides); track repair → H4 → C4;
 // feel → { reply, brief } ('prose' mode: plain text); channel → the draft, renamed.
 // FAKE_SLP_MODE: 'bad-first' (first compose/channel has an invalid scene, first
-// track a bad pitch), 'fail', 'hang', 'prose'.
+// track a bad pitch), 'fail', 'hang', 'prose', 'mangle' (channel: alters the
+// written phrases' notes, names, weights, quote, tonic and ladder, or invents
+// written phrases when the draft has none).
 // FAKE_SLP_LOG: append {args, cwd, claudecode, prompt} as JSON lines.
 import fs from 'node:fs';
 
@@ -37,6 +39,21 @@ else if (prompt.includes('# Radio review')) {
   const draft = JSON.parse(prompt.split('## The draft')[1].match(/```json\n([\s\S]*?)\n```/)[1]);
   const out = { ...draft, name: 'Harbour Jam', scene: mode === 'bad-first' ? 'nowhere' : draft.scene };
   delete out.id; delete out.origin; delete out.prompt;
+  if (mode === 'mangle' && draft.written) {
+    out.written = structuredClone(draft.written);
+    out.written[0].parts[0].bars[0] = '0:C4:1';
+    out.written[0].name = 'The theme';
+    out.written[0].weight = 2;
+    out.written[1].name = 'a name far too long for the display';
+    out.written[1].weight = -1;
+    out.written.pop();
+    out.quote = 0.6;
+    out.tonic = (draft.tonic + 2) % 12;
+    out.layers = draft.layers.map((ls) => ls.filter((l) => l !== 'bass'));
+  } else if (mode === 'mangle') {
+    out.written = [{ chords: '1:8', parts: [{ layer: 'pad', voice: 'pad.warm', enter: 0, bars: Array(8).fill('0:C4:16') }] }];
+    out.quote = 0.9;
+  }
   process.stdout.write(JSON.stringify(out));
 } else if (prompt.includes('## Validator errors')) {
   const json = JSON.parse(prompt.split('## Your JSON')[1].match(/```json\n([\s\S]*?)\n```/)[1]);

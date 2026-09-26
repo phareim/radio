@@ -53,7 +53,7 @@ All JSON. Everything except `GET /health` needs `Authorization: Bearer $RADIO_AP
 | DELETE | `/jam/snippets/:id` | | `{id, deleted: true}` |
 | POST | `/jam/track` | `{piece, request, layer?, phrases?: number[]}` | 202 `{job}` |
 | POST | `/jam/feel` | `{piece, messages?: [{role: 'petter'\|'opus', text}]}` | 202 `{job}` |
-| POST | `/jam/channel` | `{piece}` | 202 `{job}` |
+| POST | `/jam/channel` | `{piece, written?: boolean}` | 202 `{job}` |
 
 Job `status` is `queued`, `running`, `done` or `error`. A compose result is
 `{landscape, repaired, painting}`; a review result is `{review: {id, path, summary, feedbackFrom, feedbackTo, items}}`
@@ -119,7 +119,17 @@ time). Each validates the piece in the body first (400 if invalid).
   `pieceToLandscape(piece, base)` as the draft (base: a built-in, or one of
   the owner's composed channels), the instruction to keep its progressions,
   grooves, bass patterns and motifs and add what lasts for hours, the feel
-  brief and the scene ids. It then takes the compose path
+  brief and the scene ids. The draft carries the piece's phrases as
+  `written` phrases (the radio quotes them now and then, see
+  `docs/engine.md`); the prompt lists them and asks Opus to copy them
+  unchanged, name them, weigh them and set `quote`, and to compose the rest
+  around them. Whatever Opus sends, `enforceWritten` puts the draft's
+  phrases back before validation (Opus's names, weights and `quote` kept
+  when valid), keeps `tonic` and the mood-0.5 mode the notes are written
+  in, and puts each part's layer back on the ladder from its `enter` up, so
+  the model never changes a note. `written: false` in the body makes a
+  purely generative channel (no written phrases; any Opus invents are
+  dropped). It then takes the compose path
   (`generateLandscape` in `compose.mjs`: stamp, validate, one repair round,
   store with the owner and `origin: 'opus'`), with `prompt` = the brief plus
   `(made in jam from "<name>")`, and is painted like a compose. If the owner

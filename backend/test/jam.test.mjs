@@ -284,6 +284,48 @@ test('jam-channel: the draft distilled, stored like a compose, painted, piece li
   assert.match(prompt, /Keep its progressions, grooves, bass patterns and motifs as written/);
   assert.match(prompt, /## The feel\n\nA harbour at dusk\./);
   assert.match(prompt, /`coast`, `summit`/);
+
+  // The piece's phrases ride along verbatim as written phrases.
+  const { pieceToLandscape } = await import('../../engine/piece/index.ts');
+  const { LANDSCAPES } = await import('../../engine/landscapes/index.ts');
+  const draft = pieceToLandscape(piece(), LANDSCAPES.coast);
+  assert.equal(draft.written.length, 2);
+  assert.deepEqual(l.written, draft.written);
+  assert.equal(l.quote, 0.35);
+  assert.match(prompt, /## Written phrases\n\nThe draft's `written` holds the piece's phrases note for note/);
+  assert.match(prompt, /written\[0\] 'P1': '1 6 4 5', parts bass \(bass\.finger, enters at 1\), drums \(kit\.soft, enters at 2\)/);
+  assert.match(prompt, /Copy `written` unchanged/);
+  assert.match(prompt, /export interface WrittenPhrase/);
+});
+
+test('jam-channel: the notes of written phrases are the draft\'s whatever Opus sends; names, weights and quote are its own', async () => {
+  const { pieceToLandscape } = await import('../../engine/piece/index.ts');
+  const { LANDSCAPES } = await import('../../engine/landscapes/index.ts');
+  const draft = pieceToLandscape(piece(), LANDSCAPES.coast);
+  await withMode('mangle', async () => {
+    const job = await waitJob((await api('POST', '/jam/channel', { piece: piece({ id: 'p-mangle' }) })).body.job.id);
+    assert.equal(job.status, 'done', job.error);
+    const l = job.result.landscape;
+    assert.deepEqual(l.written.map((w) => w.parts), draft.written.map((w) => w.parts), 'every note as in the piece');
+    assert.deepEqual(l.written.map((w) => [w.name, w.weight, w.chords]), [['The theme', 2, '1 6 4 5'], ['P2', undefined, '4 5 1 1']]);
+    assert.equal(l.quote, 0.6);
+    assert.equal(l.tonic, 9, 'the key the notes are written in');
+    assert.ok(l.layers[1].includes('bass') && l.layers[4].includes('bass'), 'the bass part enters at 1: back on the ladder');
+    assert.equal(job.result.repaired, false);
+
+    // Only the generative channel (option a): nothing written, even if Opus invents it.
+    writeFileSync(LOG, '');
+    const r = await api('POST', '/jam/channel', { piece: piece({ id: 'p-plain' }), written: false });
+    assert.equal(r.status, 202, r.body.error);
+    const plain = await waitJob(r.body.job.id);
+    assert.equal(plain.status, 'done', plain.error);
+    assert.equal(plain.result.landscape.written, undefined);
+    assert.equal(plain.result.landscape.quote, undefined);
+    const prompt = calls()[0].prompt;
+    assert.doesNotMatch(prompt, /## Written phrases/);
+    assert.doesNotMatch(prompt, /"written": \[/, 'the draft carries no written phrases');
+  });
+  assert.match((await api('POST', '/jam/channel', { piece: piece(), written: 'no' })).body.error, /written: true or false/);
 });
 
 test('jam-channel: one repair round; an unsaved piece is left alone', async () => {
