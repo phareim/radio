@@ -18,6 +18,12 @@ Opus does; Opus can also compose new landscapes.
 
 ## Rules
 
+- jam (`~/github/jam`, jam.phareim.no) includes this repo as the git
+  submodule `radio/` and plays pieces on this engine; radio-api's `/jam/*`
+  routes are its backend. A change to `engine/` or `engine/piece/` reaches
+  jam when its submodule moves; keep `engine/tsconfig.json` so the engine
+  bundles without this app's `.nuxt/`.
+
 - `engine/` is erasable-syntax TypeScript with `.ts` import extensions, so
   Node runs it natively (the backend validates Opus's landscapes with it)
   and Vite bundles it. No enums, namespaces or parameter properties.
