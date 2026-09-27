@@ -18,9 +18,9 @@ jobs:
 
       - run: npm ci
 
-      - run: node --no-warnings --test tests/engine.test.ts
+      - run: npm run test:engine
 
-      - run: node --no-warnings --test tests/piece.test.ts
+      - run: npm run typecheck
 
       - run: node --no-warnings --test 'backend/test/*.test.mjs'
 

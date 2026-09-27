@@ -27,6 +27,12 @@ function persist(): void {
   }, 600)
 }
 
+/** Another member signed in on this browser: start from nothing. */
+function forget(): void {
+  hidden.value = []
+  synced = false
+}
+
 /** Members: take the server's copy, or seed it with this browser's. */
 async function sync(): Promise<void> {
   try {
@@ -67,5 +73,5 @@ const visible = computed<Landscape[]>(() => {
 })
 
 export function useChannels() {
-  return { hidden, visible, isHidden, setShown, sync }
+  return { hidden, visible, isHidden, setShown, sync, forget }
 }

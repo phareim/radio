@@ -35,7 +35,7 @@ All JSON. Everything except `GET /health` needs `Authorization: Bearer $RADIO_AP
 |---|---|---|---|
 | GET | `/health` | | `{ok, service, uptime_s, jobsPending, unreviewed}` |
 | POST | `/feedback` | `{rating: 1\|-1\|0, comment, snapshot: FeedbackSnapshot}` (rating 0 needs a comment) | 201 `{id}` |
-| PATCH | `/feedback/:id` | `{comment}` | `{feedback}` |
+| PATCH | `/feedback/:id` | `{comment}` | `{feedback}`; only the member who gave it (404 otherwise) |
 | GET | `/feedback` | `?limit=` (default 50, max 500) `&landscape=` | `{feedback: [...]}`, newest first |
 | GET | `/feedback/stats` | | `{stats: [{landscape, up, down, comments, total, unreviewed}]}` |
 | GET | `/landscapes` | | `{landscapes: Landscape[]}`: Opus-composed, not hidden, oldest first, each with `origin: 'opus'` and `prompt` |
@@ -43,7 +43,7 @@ All JSON. Everything except `GET /health` needs `Authorization: Bearer $RADIO_AP
 | POST | `/compose` | `{prompt, base?: built-in id}` | 202 `{job}` |
 | POST | `/review` | | 202 `{job}` |
 | GET | `/reviews` | | `{reviews: [{id, at, feedbackFrom, feedbackTo, path, summary}]}` |
-| GET | `/jobs/:id` | | `{job: {id, kind, status, input, result, error, createdAt, finishedAt}}` |
+| GET | `/jobs/:id` | | `{job: {id, kind, status, result, error, createdAt, finishedAt}}`; only the member who started it (404 otherwise), review jobs to any member |
 | GET | `/jam/pieces` | | `{pieces: [{id, name, updatedAt, channel?}]}`, last saved first |
 | GET | `/jam/pieces/:id` | | `{piece, updatedAt}` |
 | PUT | `/jam/pieces/:id` | Piece (`engine/piece/types.ts`) | `{piece, updatedAt}`: the validated copy |
@@ -57,8 +57,11 @@ All JSON. Everything except `GET /health` needs `Authorization: Bearer $RADIO_AP
 
 Job `status` is `queued`, `running`, `done` or `error`. A compose result is
 `{landscape, repaired, painting}`; a review result is `{review: {id, path, summary, feedbackFrom, feedbackTo, items}}`
-or `{skipped}` when there is nothing to review. jam's results are under Jam below. Jobs cut off by a restart are
-marked `error: interrupted by a restart`.
+or `{skipped}` when there is nothing to review. jam's results are under Jam below. A job keeps its `owner`
+(the `X-Radio-User` that asked) and never hands its input back. At most 20 jobs wait at once; the next
+gets 503. Every deploy restarts radio-api (a painting's own push too), so a restart queues the jobs it left
+queued or running again and runs them from the start; a job already started twice is marked
+`error: interrupted by a restart` instead.
 
 CORS allows `RADIO_CORS_ORIGINS` and any `http://localhost:*`.
 
@@ -242,6 +245,7 @@ The Worker passes the signed-in member's email as `X-Radio-User` (trusted
 because only the Worker holds the Bearer key). Composed landscapes carry an
 `owner` and are listed and removable only by their owner (`GET /landscapes`
 without the header returns none). `GET` / `PUT /settings` keep a member's
-settings (`{ hidden: [channel ids] }`). Feedback rows record the `user`.
+settings (`{ hidden: [channel ids] }`). Feedback rows record the `user`, and
+only that user may change the comment. Jobs record their `owner` the same way.
 Rows from before owners existed belong to `RADIO_LEGACY_OWNER`
 (default phareim@gmail.com); the migration runs on start.

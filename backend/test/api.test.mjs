@@ -100,6 +100,9 @@ test('feedback: create, validate, patch, list, stats', async () => {
   assert.equal(p.status, 200);
   assert.equal(p.body.feedback.comment, 'the lead here');
   assert.equal((await api('PATCH', '/feedback/9999', { comment: 'x' })).status, 404);
+  // Only the listener who gave it may change it.
+  assert.equal((await api('PATCH', `/feedback/${a.body.id}`, { comment: 'mine now' }, { user: 'other@example.com' })).status, 404);
+  assert.equal((await api('PATCH', `/feedback/${a.body.id}`, { comment: 'mine now' }, { user: null })).status, 401);
 
   const list = await api('GET', '/feedback?limit=2');
   assert.deepEqual(list.body.feedback.map((f) => f.id), [c.body.id, b.body.id]);
@@ -177,6 +180,54 @@ test('compose: bad input is refused, slp failure becomes a job error', async () 
     delete process.env.FAKE_SLP_MODE;
   }
   assert.equal((await api('GET', '/jobs/9999')).status, 404);
+});
+
+test('jobs: only the owner sees a job, and never its input', async () => {
+  const r = await api('POST', '/compose', { prompt: 'a private prompt' });
+  assert.equal(r.body.job.input, undefined);
+  const job = await waitJob(r.body.job.id);
+  assert.equal(job.input, undefined);
+  assert.equal((await api('GET', `/jobs/${r.body.job.id}`, null, { user: 'other@example.com' })).status, 404);
+  assert.equal((await api('GET', `/jobs/${r.body.job.id}`, null, { user: null })).status, 401);
+  // A review has no owner: any member may follow it.
+  const rv = Number(db.prepare(`INSERT INTO jobs (kind, status, input, created_at) VALUES ('review', 'done', '{}', ?)`)
+    .run(new Date().toISOString()).lastInsertRowid);
+  assert.equal((await api('GET', `/jobs/${rv}`, null, { user: 'other@example.com' })).status, 200);
+});
+
+test('jobs: a restart runs what it left behind again, once', async () => {
+  const { createJobs } = await import('../lib/jobs.mjs');
+  const jdb = openDb(join(TMP, 'restart.db'));
+  const at = new Date().toISOString();
+  const add = (status, attempts) => Number(jdb.prepare(`INSERT INTO jobs (kind, status, input, owner, created_at, attempts) VALUES ('echo', ?, ?, 'a@b.c', ?, ?)`)
+    .run(status, JSON.stringify({ n: attempts, owner: 'a@b.c' }), at, attempts).lastInsertRowid);
+  const queued = add('queued', 0);
+  const running = add('running', 1);
+  const twice = add('running', 2);
+  const q = createJobs(jdb, { echo: async (input) => ({ n: input.n }) });
+  await q.idle();
+  const row = (id) => jdb.prepare('SELECT status, result, error, attempts FROM jobs WHERE id = ?').get(id);
+  assert.deepEqual({ ...row(queued) }, { status: 'done', result: '{"n":0}', error: null, attempts: 1 });
+  assert.deepEqual({ ...row(running) }, { status: 'done', result: '{"n":1}', error: null, attempts: 2 });
+  assert.equal(row(twice).status, 'error');
+  assert.equal(row(twice).error, 'interrupted by a restart');
+  jdb.close();
+});
+
+test('jobs: a full queue refuses with 503', async () => {
+  const { createJobs } = await import('../lib/jobs.mjs');
+  const jdb = openDb(join(TMP, 'full.db'));
+  let release;
+  const gate = new Promise((r) => { release = r; });
+  const q = createJobs(jdb, { wait: () => gate }, { maxPending: 2 });
+  q.enqueue('wait', {});
+  q.enqueue('wait', {});
+  assert.throws(() => q.enqueue('wait', {}), (e) => e.status === 503);
+  release();
+  await q.idle();
+  q.enqueue('wait', {});
+  await q.idle();
+  jdb.close();
 });
 
 test('compose: a hung slp is killed at the timeout', async () => {

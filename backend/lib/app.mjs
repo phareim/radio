@@ -135,7 +135,8 @@ export function createApp({ db, apiKey, corsOrigins = [], ask, paint = startPain
     ['PATCH', /^\/feedback\/(\d+)$/, async (req, [, id]) => {
       const b = await readJson(req);
       if (typeof b.comment !== 'string') throw new HttpError(400, 'comment must be a string');
-      const r = db.prepare('UPDATE feedback SET comment = ? WHERE id = ?').run(b.comment.slice(0, 4000), Number(id));
+      const u = needListener(req);
+      const r = db.prepare('UPDATE feedback SET comment = ? WHERE id = ? AND user = ?').run(b.comment.slice(0, 4000), Number(id), u);
       if (r.changes === 0) throw new HttpError(404, 'no such feedback');
       return { feedback: feedbackRow(db.prepare('SELECT * FROM feedback WHERE id = ?').get(Number(id))) };
     }],
@@ -210,8 +211,9 @@ export function createApp({ db, apiKey, corsOrigins = [], ask, paint = startPain
 
     ...jamRoutes({ db, jobs, HttpError, readJson, needListener }),
 
-    ['GET', /^\/jobs\/(\d+)$/, async (_req, [, id]) => {
-      const job = jobs.get(Number(id));
+    // A job is its owner's; review jobs have none and any member may follow them.
+    ['GET', /^\/jobs\/(\d+)$/, async (req, [, id]) => {
+      const job = jobs.get(Number(id), needListener(req));
       if (!job) throw new HttpError(404, 'no such job');
       return { job };
     }],

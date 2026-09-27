@@ -37,8 +37,8 @@ Opus does; Opus can also compose new landscapes.
 
 ## Commands
 
-- `node --no-warnings --test tests/engine.test.ts` — engine invariants
-- `node --no-warnings --test tests/piece.test.ts` — pieces (jam)
+- `npm run test:engine` — engine invariants, pieces (jam) and audio timing
+- `heavy -- npm run typecheck` — vue-tsc over app, engine, scene and tests
 - `node --no-warnings tests/timeline.ts [bars]` — print a scripted session bar by bar
 - `node --no-warnings --test 'backend/test/*.test.mjs'` — backend
 - `npm run dev` — the app on port 3040 (no login on localhost)
@@ -46,6 +46,6 @@ Opus does; Opus can also compose new landscapes.
 
 ## Deploy
 
-Push to `main`: GitHub Actions tests, builds and deploys the Worker
+Push to `main`: GitHub Actions tests, typechecks, builds and deploys the Worker
 `radio-web`; the Sleeper deploy webhook pulls the repo and restarts
 `radio-api`.

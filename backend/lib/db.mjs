@@ -12,7 +12,9 @@ const JOBS_COLUMNS = `
   result TEXT,
   error TEXT,
   created_at TEXT NOT NULL,
-  finished_at TEXT`;
+  finished_at TEXT,
+  owner TEXT,
+  attempts INTEGER NOT NULL DEFAULT 0`;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS feedback (
@@ -115,6 +117,14 @@ function migrate(db) {
     db.prepare('UPDATE feedback SET user = ? WHERE user IS NULL').run(legacy);
   }
   freeJobKinds(db);
+  // A job belongs to the listener who asked for it; attempts lets a restart
+  // run it again once (lib/jobs.mjs). Added 2026-09-27.
+  const jc = cols('jobs');
+  if (!jc.includes('owner')) {
+    db.exec('ALTER TABLE jobs ADD COLUMN owner TEXT');
+    db.exec(`UPDATE jobs SET owner = json_extract(input, '$.owner') WHERE json_valid(input)`);
+  }
+  if (!jc.includes('attempts')) db.exec('ALTER TABLE jobs ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0');
 }
 
 /**
@@ -165,7 +175,6 @@ export function jobRow(r) {
     id: r.id,
     kind: r.kind,
     status: r.status,
-    input: parse(r.input),
     result: parse(r.result),
     error: r.error ?? null,
     createdAt: r.created_at,

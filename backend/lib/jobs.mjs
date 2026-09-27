@@ -1,24 +1,26 @@
 // Job queue: rows in `jobs`, run one at a time (one Opus call at a time).
-// Jobs left queued or running by a restart are marked as errors at startup.
+// A restart (every deploy restarts radio-api) picks up the jobs it left
+// queued or running and runs them again; a job that has already been started
+// twice is marked as an error instead, so one that kills the process cannot
+// loop.
 
 import { now, jobRow } from './db.mjs';
 
-export function createJobs(db, handlers) {
+/** Starts a job may have before a restart gives up on it. */
+export const MAX_ATTEMPTS = 2;
+
+export function createJobs(db, handlers, { maxPending = 20 } = {}) {
   let chain = Promise.resolve();
   let pending = 0;
 
-  db.prepare(
-    `UPDATE jobs SET status = 'error', error = 'interrupted by a restart', finished_at = ?
-     WHERE status IN ('queued', 'running')`,
-  ).run(now());
-
-  const get = (id) => {
+  /** A job as `who` may see it: null when there is none or it is someone else's. */
+  const get = (id, who) => {
     const r = db.prepare('SELECT * FROM jobs WHERE id = ?').get(id);
-    return r ? jobRow(r) : null;
+    return r && (r.owner == null || r.owner === who) ? jobRow(r) : null;
   };
 
   async function run(id, kind, input) {
-    db.prepare(`UPDATE jobs SET status = 'running' WHERE id = ?`).run(id);
+    db.prepare(`UPDATE jobs SET status = 'running', attempts = attempts + 1 WHERE id = ?`).run(id);
     try {
       const result = await handlers[kind](input);
       db.prepare(`UPDATE jobs SET status = 'done', result = ?, finished_at = ? WHERE id = ?`)
@@ -32,15 +34,31 @@ export function createJobs(db, handlers) {
     }
   }
 
-  function enqueue(kind, input) {
-    if (!handlers[kind]) throw new Error(`unknown job kind ${kind}`);
-    const { lastInsertRowid } = db
-      .prepare(`INSERT INTO jobs (kind, status, input, created_at) VALUES (?, 'queued', ?, ?)`)
-      .run(kind, JSON.stringify(input ?? null), now());
-    const id = Number(lastInsertRowid);
+  function schedule(id, kind, input) {
     pending++;
     chain = chain.then(() => run(id, kind, input));
-    return get(id);
+  }
+
+  const left = db.prepare(`SELECT id, kind, input, attempts FROM jobs WHERE status IN ('queued', 'running') ORDER BY id`).all();
+  for (const j of left) {
+    if (j.attempts < MAX_ATTEMPTS && handlers[j.kind]) {
+      db.prepare(`UPDATE jobs SET status = 'queued' WHERE id = ?`).run(j.id);
+      schedule(j.id, j.kind, j.input == null ? null : JSON.parse(j.input));
+    } else {
+      db.prepare(`UPDATE jobs SET status = 'error', error = 'interrupted by a restart', finished_at = ? WHERE id = ?`)
+        .run(now(), j.id);
+    }
+  }
+
+  function enqueue(kind, input) {
+    if (!handlers[kind]) throw new Error(`unknown job kind ${kind}`);
+    if (pending >= maxPending) throw Object.assign(new Error('the queue is full, try again in a few minutes'), { status: 503 });
+    const { lastInsertRowid } = db
+      .prepare(`INSERT INTO jobs (kind, status, input, owner, created_at) VALUES (?, 'queued', ?, ?, ?)`)
+      .run(kind, JSON.stringify(input ?? null), input?.owner ?? null, now());
+    const id = Number(lastInsertRowid);
+    schedule(id, kind, input);
+    return get(id, input?.owner ?? null);
   }
 
   return {

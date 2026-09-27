@@ -51,6 +51,11 @@ scripts/make-icons.py      favicon, apple-touch and manifest icons (Pillow)
   keeps an owner per landscape; the Worker passes the member's email as
   `X-Radio-User`). Which channels show is kept per browser, or for members
   in radio-api's `settings` table, so it follows them to every device.
+  When a fresh session answer names another member (or nobody),
+  `useAuth` drops the last member's copies in this browser: composed
+  channels, the compose job, hidden channels, the service worker's API
+  cache, and their unsent notes if someone else signed in. Offline, the
+  service worker's cached session answer stands.
 - DIM (`radio.calm`) hides everything but the picture; AUTO, ▶▶ and SHOW
   stay in the corner and fade after a few seconds without the pointer.
 - AUTO (`composables/useAuto.ts`) stays 7–11 listening minutes in a place,
