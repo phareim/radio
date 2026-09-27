@@ -61,4 +61,5 @@ export const jungle: Landscape = {
   fx: { reverb: 0.3, delay: 0.25, reverbSize: 2.2, tone: 0.85, grit: 0.2 },
   ambience: { 'birds.jungle': 0.45, insects: 0.35, stream: 0.25 },
   accent: '#3fe0a0',
+  alt: { lead: ['mallet.marimba', 'guitar.nylon'], arp: ['guitar.nylon', 'mallet.kalimba'], counter: ['guitar.nylon', 'mallet.marimba'] },
 }

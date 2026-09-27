@@ -56,4 +56,5 @@ export const summit: Landscape = {
   fx: { reverb: 0.55, delay: 0.35, reverbSize: 5, tone: 0.75, grit: 0.15 },
   ambience: { 'wind.high': 0.45, wind: 0.3 },
   accent: '#cfc6ff',
+  alt: { lead: ['lead.whistle', 'guitar.nylon', 'keys.piano'], arp: ['pluck.harp', 'guitar.steel'] },
 }

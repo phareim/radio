@@ -363,6 +363,25 @@ export interface Landscape {
   /** Accent colour for the UI (hex). */
   accent: string
   /**
+   * Other instruments for the conductor to orchestrate with, section by
+   * section. Home sections (A) keep the landscape's own voices; the varied
+   * section (A2) may give the arp or counter another; the contrast section
+   * (B) may hand the lead, arp, bass or pad to one; when the home theme
+   * returns after a contrast at intensity 3 or 4, `double` plays the lead an
+   * octave below. Each list holds up to four voices of a character that fits
+   * the place (a lofi lead.ep → keys.felt, keys.piano; a nylon-guitar arp
+   * in a warm village). Left out, related voices are chosen for you; an empty
+   * list keeps that layer's voice, and `double: null` turns doubling off.
+   */
+  alt?: {
+    lead?: VoiceId[]
+    arp?: VoiceId[]
+    pad?: VoiceId[]
+    bass?: VoiceId[]
+    counter?: VoiceId[]
+    double?: VoiceId | null
+  }
+  /**
    * Written phrases (at most 8) the conductor quotes between its generated
    * sections: now and then a section becomes one of these, played for one
    * 8-bar phrase over its own chords, then the music goes on generating.

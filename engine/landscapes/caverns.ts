@@ -56,4 +56,5 @@ export const caverns: Landscape = {
   fx: { reverb: 0.55, delay: 0.4, reverbSize: 3.5, tone: 0.7, grit: 0.25 },
   ambience: { stream: 0.3, shimmer: 0.2, wind: 0.1 },
   accent: '#2ff3ff',
+  alt: { lead: ['lead.square'], arp: ['arp.square', 'mallet.kalimba'], counter: ['counter.strings'] },
 }

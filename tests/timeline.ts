@@ -41,7 +41,9 @@ const c = createConductor({ lookup, seed, controls: start })
 for (let i = 0; i < bars; i++) {
   if (script[i]) { c.setControls(script[i]!); console.log(`      >>> ${JSON.stringify(script[i])}`) }
   const p = c.nextBar()
-  const lead = p.notes.filter(n => n.layer === 'lead').map(n => midiName(n.midi, p.key)).join(' ')
+  const leadNotes = p.notes.filter(n => n.layer === 'lead')
+  const lead = leadNotes.length ? `${leadNotes[0]!.voice}${new Set(leadNotes.map(n => n.voice)).size > 1 ? '+' : ''} ${leadNotes.filter(n => n.voice === leadNotes[0]!.voice).map(n => midiName(n.midi, p.key)).join(' ')}` : ''
+  const others = [...new Set(p.notes.filter(n => n.layer !== 'lead').map(n => n.voice))].join(',')
   const counts = p.meta.active.filter(l => l !== 'ambience').map(l => l[0]!.toUpperCase() + l.slice(1, 3)).join(' ')
   const kick = p.drums.filter(d => d.hit === 'k').length
   console.log(
@@ -49,5 +51,6 @@ for (let i = 0; i < bars; i++) {
     `${p.bpmStart.toFixed(0)}bpm ${p.key.mode.slice(0, 4)} ${p.chords.map(s => s.chord.symbol).join('|').padEnd(14)} [${counts}] k${kick}`,
     p.meta.transition.note ? `«${p.meta.transition.note}»` : '',
     lead ? `lead: ${lead}` : '',
+    process.env.VOICES ? `{${others}}` : '',
   )
 }

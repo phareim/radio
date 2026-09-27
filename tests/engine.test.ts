@@ -76,17 +76,38 @@ test('a build brings layers in one at a time on the grid', () => {
   assert.equal(firstBar.get('lead')! % 8, 0, 'lead on a phrase')
 })
 
-test('a landscape change waits for the phrase, bridges four bars, then arrives', () => {
-  const plans = run(3, 60, i => (i === 21 ? { landscape: 'frostwood' } : null), { landscape: 'coast', intensity: 3 })
+test('a landscape change near in tempo waits for the phrase, bridges four bars, then arrives', () => {
+  const plans = run(3, 60, i => (i === 21 ? { landscape: 'jungle' } : null), { landscape: 'coast', intensity: 3 })
   const bridge = plans.filter(p => p.meta.section === 'bridge')
   assert.equal(bridge.length, 4)
   assert.equal(bridge[0]!.index, 24, 'bridge starts at the next phrase')
   assert.ok(!bridge.some(p => p.meta.active.includes('drums')), 'no drums in the bridge')
   assert.ok(plans[23]!.drums.length > 0, 'the old beat plays out the phrase')
   const after = plans[28]!
-  assert.equal(after.meta.landscape, 'frostwood')
-  assert.equal(Math.round(after.bpmStart), 72)
+  assert.equal(after.meta.landscape, 'jungle')
+  assert.equal(Math.round(after.bpmStart), 104)
   assert.ok(bridge[3]!.meta.scene.blendEnd === 1 && bridge[0]!.meta.scene.blendStart === 0)
+})
+
+test('across a big tempo gap the bridge takes eight bars and the tempo lands before the beat', () => {
+  const plans = run(3, 70, i => (i === 21 ? { landscape: 'frostwood' } : null), { landscape: 'coast', intensity: 3 })
+  const bridge = plans.filter(p => p.meta.section === 'bridge')
+  assert.equal(bridge.length, 8)
+  assert.equal(bridge[0]!.index, 24)
+  assert.ok(bridge[7]!.meta.scene.blendEnd === 1 && bridge[0]!.meta.scene.blendStart === 0)
+  assert.ok(!bridge.slice(2).some(p => p.meta.active.includes('bass')), 'the bass leaves early, the glide happens under the pad')
+  // 108 → 72 over the eight bridge bars and four more: smooth, one way, landing at bar 36.
+  const glide = plans.slice(24, 37)
+  for (let i = 0; i < glide.length; i++) {
+    const p = glide[i]!
+    assert.ok(p.bpmEnd <= p.bpmStart + 1e-9, `bar ${p.index} speeds up`)
+    assert.ok(p.bpmStart - p.bpmEnd <= 1.6 * 36 / 12, `bar ${p.index} lurches ${p.bpmStart - p.bpmEnd}`)
+  }
+  assert.ok(plans[24]!.bpmStart - plans[24]!.bpmEnd < 1, 'the glide eases in')
+  assert.equal(Math.round(plans[36]!.bpmStart), 72)
+  assert.equal(plans[32]!.meta.landscape, 'frostwood')
+  const beat = plans.find(p => p.index >= 32 && p.meta.active.some(l => l === 'bass' || l === 'drums' || l === 'arp'))
+  assert.ok(beat && beat.index >= 36, `rhythm entered at ${beat?.index} before the tempo landed`)
 })
 
 test('lowering intensity waits for the phrase end, with a closing fill', () => {
@@ -105,9 +126,10 @@ test('hold loops the section exactly', () => {
 
 // ---- written phrases ------------------------------------------------------------
 
-test('built-in landscapes play exactly as before written phrases existed', () => {
-  // SHA-256 of main's plans at 08d2695 over scripted sessions on every
-  // built-in: a landscape without `written` must plan byte for byte the same.
+test('built-in landscapes plan exactly as pinned', () => {
+  // SHA-256 of the plans over scripted sessions on every built-in (last set
+  // for engine 1.2.0: phrase shapes, orchestration, long crossings): a
+  // landscape without `written` must plan byte for byte the same.
   // Change the hash only for a deliberate change to the composer or conductor.
   const h = createHash('sha256')
   const ids = BUILTIN.map(l => l.id)
@@ -124,7 +146,7 @@ test('built-in landscapes play exactly as before written phrases existed', () =>
       h.update(JSON.stringify(c.nextBar()))
     }
   }
-  assert.equal(h.digest('hex'), '387591d82a265d4fe6286ddfee7c4dc6c6efcd1264586110e20a7976895476e2')
+  assert.equal(h.digest('hex'), '74695bc51926034bd3e75bea72d4d6ac7be3cb289b90b03e5e8d5d6a5b180f10')
 })
 
 /**
@@ -353,5 +375,78 @@ test('random sessions with written landscapes stay in range', () => {
       }
       if (isW(p)) assert.equal(p.meta.landscape, W.id)
     }
+  }
+})
+
+// ---- variation: orchestration and phrase shapes ------------------------------
+
+test('sections orchestrate: home voices in A, other instruments in B, a doubled lead on the return', () => {
+  const L = LANDSCAPES.village!
+  const plans = run(4, 600, () => null, { landscape: 'village', intensity: 4 })
+  const leadVoices = (sec: string) => new Set(plans.filter(p => p.meta.section === sec).flatMap(p => p.notes.filter(n => n.layer === 'lead').map(n => n.voice)))
+  const b = leadVoices('B')
+  assert.ok([...b].some(v => L.alt!.lead!.includes(v)), `B leads: ${[...b]}`)
+  // The first A is the landscape itself.
+  const first = plans.filter(p => p.meta.section === 'A' && p.index < 16)
+  for (const p of first) for (const n of p.notes) {
+    if (n.layer === 'lead') assert.equal(n.voice, L.lead!.voice)
+    if (n.layer === 'arp') assert.equal(n.voice, L.arp!.voice)
+    if (n.layer === 'bass') assert.equal(n.voice, L.bass.voice)
+  }
+  // A returning A doubles the lead an octave below with another instrument.
+  const doubled = plans.find(p => p.meta.section === 'A' && p.index > 16 && p.notes.some(n => n.layer === 'lead' && n.voice !== L.lead!.voice))
+  assert.ok(doubled, 'no doubled return')
+  const own = doubled!.notes.filter(n => n.layer === 'lead' && n.voice === L.lead!.voice)
+  const dbl = doubled!.notes.filter(n => n.layer === 'lead' && n.voice !== L.lead!.voice)
+  assert.deepEqual(dbl.map(n => [n.step, n.midi + 12]), own.map(n => [n.step, n.midi]))
+})
+
+test('alt validates, and a bad one says what to fix', () => {
+  const L = structuredClone(LANDSCAPES.village!) as unknown as Record<string, any>
+  L.alt = { lead: ['keys.nope'], drums: ['kit.soft'], arp: ['guitar.nylon', 'guitar.steel', 'keys.felt', 'keys.piano', 'pluck.harp'], double: 'lead.x' }
+  const errs = validateLandscape(L).errors
+  assert.ok(errs.some(e => /^alt\.lead\[0\]: unknown voice 'keys\.nope'/.test(e)), errs.join('\n'))
+  assert.ok(errs.some(e => /^alt\.drums: not a layer/.test(e)), errs.join('\n'))
+  assert.ok(errs.some(e => /^alt\.arp: a list of at most 4/.test(e)), errs.join('\n'))
+  assert.ok(errs.some(e => /^alt\.double: unknown voice/.test(e)), errs.join('\n'))
+  L.alt = { lead: [], double: null }
+  assert.deepEqual(validateLandscape(L).errors, [])
+})
+
+test('an empty alt list and double null keep the landscape its own voices', () => {
+  const L: Landscape = { ...structuredClone(LANDSCAPES.village!), id: 'plain', scene: 'village', alt: { lead: [], arp: [], pad: [], bass: [], counter: [], double: null } }
+  const plans = runOn(L, 4, 400, { intensity: 4 })
+  const voices = new Set(plans.flatMap(p => p.notes.filter(n => n.layer !== 'bells' && n.layer !== 'drone').map(n => `${n.layer}:${n.voice}`)))
+  const own = new Set([`pad:${L.pad.voice}`, `bass:${L.bass.voice}`, `arp:${L.arp!.voice}`, `lead:${L.lead!.voice}`, `counter:${L.counter!.voice}`])
+  for (const v of voices) assert.ok(own.has(v), `${v} in a plain landscape`)
+})
+
+test('a call phrase leaves the lead silent while the counter line echoes', () => {
+  let found = false
+  for (const id of ['coast', 'nightdrive', 'village', 'frostwood']) for (const seed of [1, 2, 3, 4, 5, 6]) {
+    const plans = run(seed, 240, () => null, { landscape: id, intensity: 4 })
+    for (const p of plans) {
+      if (p.meta.phraseBar !== 2 || p.meta.phraseBars !== 8) continue
+      const next = plans[p.index + 1]
+      const counterNotes = (x: BarPlan) => x.notes.filter(n => n.layer === 'counter')
+      // An echo moves in the lead's rhythm: more notes than the counter's chord-by-chord line.
+      const echoing = counterNotes(p).length > p.chords.length && next && counterNotes(next).length > 0
+      if (!echoing) continue
+      assert.equal(p.notes.filter(n => n.layer === 'lead').length, 0, `${id} bar ${p.index}: lead plays over the echo`)
+      found = true
+    }
+  }
+  assert.ok(found, 'no call phrase found')
+})
+
+test('the bass walks into the next section', () => {
+  const plans = run(2, 200, () => null, { landscape: 'coast', intensity: 3 })
+  const ends = plans.filter((p, i) => plans[i + 1] && plans[i + 1]!.meta.section !== p.meta.section && p.meta.section !== 'bridge'
+    && p.chords[p.chords.length - 1]!.chord.bass !== plans[i + 1]!.chords[0]!.chord.bass)
+  assert.ok(ends.length > 0)
+  for (const p of ends) {
+    const tail = p.notes.filter(n => n.layer === 'bass' && n.step >= 12).sort((a, b) => a.step - b.step)
+    assert.ok(tail.length >= 2, `bar ${p.index}: no walk`)
+    for (let i = 1; i < tail.length; i++) assert.ok(tail[i]!.midi > tail[i - 1]!.midi, `bar ${p.index}: the walk goes up`)
   }
 })

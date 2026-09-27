@@ -14,6 +14,7 @@ engine/validate.ts     validateLandscape(): checks a Landscape (built-in or Opus
 engine/rng.ts          seeded RNG
 engine/composer.ts     writes bars: melody from motifs, bass, arp, drums, pads, bells
 engine/conductor.ts    ConductorLike: steers toward the Controls at musical boundaries
+engine/orchestra.ts    which instrument plays each layer, section by section (Landscape.alt, KIN)
 engine/written.ts      written phrases (Landscape.written): parsing, pitch mapping, one bar of a quote
 engine/landscapes/     the built-in landscapes, one file each, index.ts lists them
 engine/audio/          the Web Audio side: player (scheduler), voices, drums, ambience, fx
@@ -36,15 +37,52 @@ where a musician would put them:
 |---|---|
 | intensity up | layers enter one at a time, from the next half-phrase boundary, 2 bars apart: drone/pad → bass → perc → drums (on a half-phrase, with a pickup fill) → arp → bells → counter → lead (on a phrase start); the patterns (bass line, groove, arp rate) climb one level per entry or half-phrase |
 | intensity down | the current phrase finishes as it is; drums play out with a closing fill; layers leave and patterns drop at the phrase boundary |
-| landscape | the current progression runs to its cadence, the lead drops out, then a 4-bar bridge pivots the harmony (common chord, else the new key's dominant) while tempo, fx and ambience glide; the new landscape arrives with pad and drone, then builds up layer by layer to the target intensity |
+| landscape | the current progression runs to its cadence, the lead drops out, then a 4-bar bridge pivots the harmony (common chord, else the new key's dominant) while tempo, fx and ambience glide; the new landscape arrives with pad and drone, then builds up layer by layer to the target intensity. Across a tempo gap of 12 bpm or more the bridge takes 8 bars (each chord two), the bass leaves with the arp two bars in, and the tempo glide (eased at both ends) runs on 4 bars past the arrival; nothing rhythmic enters until it has landed |
 | mood | the mode changes when the next progression starts |
 | density | next phrase |
 | space, grit | glide over about a bar |
-| tempo | glides across the next phrase |
+| tempo | glides across the next phrase (eased at both ends) |
 | hold | freezes progression and motif; the section loops until released |
 
 The conductor plans lazily, one bar at a time, so a new control value
 re-plans from wherever the music is.
+
+## Variation (engine 1.2.0)
+
+Left at one intensity, the music still develops:
+
+- **Phrase shapes** (`PhraseShape` in `composer.ts`). Each 8-bar phrase
+  picks how the lead spends it, from the section's seed: *classic*
+  (statement, the statement again from the next chord tone up, variation,
+  cadence), *period* (a question ending on a half cadence in bar 4, then
+  the answer restating the opening and closing on the root), *sentence*
+  (the idea, the idea higher, its first half repeated and rising, a climb,
+  the cadence) and *call* (the lead states the idea and falls silent for
+  two bars while the counter line echoes it in its own register; only
+  while the counter sounds). A sections lean classic/period, A2 sentence,
+  B call.
+- **Register**: each phrase sets where the lead's statements start
+  (`lift`, semitones from the centre of its range): A low then higher, A2
+  higher, B below the centre, the returning A at the centre then a
+  third up.
+- **Motif variations** (`varyMotif`): inversion, retrograde, a new
+  contour, the rhythm pushed two sixteenths late, long notes ornamented
+  with a passing or neighbour note, a new last bar.
+- **Orchestration** (`orchestra.ts`). A keeps the landscape's own voices.
+  A2 may give the arp or the counter another instrument (40 % each); B may
+  hand over the lead (65 %), arp (50 %), bass (35 %) or pad (30 %), and
+  half the time plays the arp in another pattern. The alternatives are
+  `Landscape.alt`, else `KIN` (related voices, jam's piano, felt piano,
+  guitars and fingered bass among them), so composed channels get them
+  too. An A that returns after B at intensity 3–4 doubles the lead an
+  octave below (`alt.double`, else `DOUBLE`).
+- **Arc**: B starts a pattern level lighter at intensity 3–4 and builds
+  back in its second phrase; a riser under its last bar lifts into the
+  returning A, which opens with a crash. The bass walks up into the next
+  chord at the end of every section (and half the phrases) from pattern
+  level 2.
+
+W sections (quotes) keep the landscape's own voices and shape.
 
 ## Written phrases
 

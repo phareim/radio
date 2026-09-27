@@ -54,4 +54,5 @@ export const neonrain: Landscape = {
   fx: { reverb: 0.35, delay: 0.3, reverbSize: 2.2, tone: 0.6, grit: 0.55 },
   ambience: { rain: 0.5, city: 0.25 },
   accent: '#ff8ae0',
+  alt: { lead: ['keys.felt', 'guitar.nylon'], arp: ['keys.felt', 'guitar.mute'], bass: ['bass.finger'], double: 'keys.felt' },
 }

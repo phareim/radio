@@ -191,6 +191,15 @@ export function validateLandscape(input: unknown): Validation {
   }
 
   if (typeof L.accent !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(L.accent)) err('accent: #rrggbb')
+  if (L.alt !== undefined) {
+    if (!isObj(L.alt)) err('alt: { lead?, arp?, pad?, bass?, counter?: voice lists; double?: voice or null }')
+    else for (const [k, v] of Object.entries(L.alt)) {
+      if (k === 'double') { if (v !== null) voice(v, 'alt.double'); continue }
+      if (!['lead', 'arp', 'pad', 'bass', 'counter'].includes(k)) { err(`alt.${k}: not a layer the conductor re-voices (lead, arp, pad, bass, counter, double)`); continue }
+      if (!Array.isArray(v) || v.length > 4) { err(`alt.${k}: a list of at most 4 voices`); continue }
+      v.forEach((x, i) => voice(x, `alt.${k}[${i}]`))
+    }
+  }
   if (L.scene !== undefined && !(SCENE_IDS as readonly string[]).includes(L.scene)) err(`scene: one of ${SCENE_IDS.join('|')}`)
   if (L.scene === undefined && !(SCENE_IDS as readonly string[]).includes(L.id)) err(`scene: required, one of ${SCENE_IDS.join('|')}`)
 
