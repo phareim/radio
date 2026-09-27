@@ -27,6 +27,7 @@ import { createNeonrain } from './scenes/neonrain.ts'
 import { createCaverns } from './scenes/caverns.ts'
 import { createCrossroadsCafe } from './scenes/crossroads-cafe-5b44.ts'
 import { createAutumnHarbour4ce5 } from './scenes/autumn-harbour-4ce5.ts'
+import { createCanopyRun8d30 } from './scenes/canopy-run-8d30.ts'
 
 export interface Scene {
   resize(cssW: number, cssH: number, dpr: number): void
@@ -48,6 +49,7 @@ const FACTORIES: Record<string, () => Place> = {
   caverns: createCaverns,
   'crossroads-cafe-5b44': createCrossroadsCafe,
   'autumn-harbour-4ce5': createAutumnHarbour4ce5,
+  'canopy-run-8d30': createCanopyRun8d30,
 }
 
 export const SCENE_IDS: readonly string[] = Object.keys(FACTORIES)
