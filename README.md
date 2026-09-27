@@ -24,7 +24,7 @@ components/
   StationDial.vue          the channels shown (1–0), then CHANNELS
   ChannelsDialog.vue       show/hide each channel, remove your own, + NEW PLACE
   IntensityBar.vue         STILL … SURGE
-  PxSlider.vue             segmented knobs (mood, space, grit, density, tempo, volume)
+  PxSlider.vue             segmented knobs (mood, space, grit, density, tempo)
   LayerStrip.vue           the ten layers lit by level, entries counting down
   CommentBox.vue           words after ▲ / ▼ / NOTE
   ComposeDialog.vue        ask Opus for a place, wait for the job
@@ -42,10 +42,10 @@ scripts/make-icons.py      favicon, apple-touch and manifest icons (Pillow)
 
 - One conductor per session, created on the first PLAY with the controls set
   so far; every change goes through `useRadio().set()`, which calls
-  `conductor.setControls` with only the changed fields. Controls and volume
-  persist in localStorage.
+  `conductor.setControls` with only the changed fields. Controls persist in
+  localStorage. There is no volume knob; the device's own volume rules.
 - Keys: Space play/pause, 1–9 and 0 places, ← → previous/next place, ↑ ↓
-  intensity, H hold, A auto, G glide on, D dim, M mute; signed in: + / −
+  intensity, H hold, A auto, G glide on, D dim; signed in: + / −
   thumbs, N note; signed out: L goes to Reader's login. Ignored while typing.
 - Channels: composed places are private to whoever composed them (radio-api
   keeps an owner per landscape; the Worker passes the member's email as

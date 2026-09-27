@@ -84,25 +84,6 @@
           :format="(v: number) => (v > 0 ? `+${v}` : `${v}`)"
           @update:model-value="set({ tempo: $event })"
         />
-        <div class="deck__vol">
-          <PxSlider
-            :model-value="muted ? 0 : volume"
-            label="VOLUME"
-            :step="0.05"
-            :segments="10"
-            color="#ff2fa0"
-            compact
-            @update:model-value="setVolume($event)"
-          />
-          <button
-            type="button"
-            class="deck__mute"
-            :class="{ on: muted }"
-            :aria-label="muted ? 'Unmute' : 'Mute'"
-            title="MUTE [M]"
-            @click="toggleMute"
-          >{{ muted ? '×' : '♪' }}</button>
-        </div>
       </div>
     </div>
 
@@ -130,7 +111,7 @@ import { coverURL } from '~/scene/cover.ts'
 import { load, save } from '~/composables/storage'
 
 const radio = useRadio()
-const { controls, playing, volume, muted, set, setVolume, toggleMute, landscapes, landscapeOf, hud } = radio
+const { controls, playing, set, landscapes, landscapeOf, hud } = radio
 const { rate, toast, say, flush } = useFeedback()
 const { compose, refresh, resume } = usePlaces()
 const { allowed, fetchSession, loginUrl } = useAuth()
@@ -316,7 +297,6 @@ function onKey(e: KeyboardEvent): void {
   else if (k === 'g' || k === 'G') { if (!e.repeat) glideOn() }
   else if (k === 'd' || k === 'D') { if (!e.repeat) setCalm(!calm.value) }
   else if (k === 'c' || k === 'C') { if (!e.repeat) channelsOpen.value = true }
-  else if (k === 'm' || k === 'M') { if (!e.repeat) toggleMute() }
   else if (allowed.value && (k === '+' || k === '=' || e.code === 'NumpadAdd')) { if (!e.repeat) void rate(1) }
   else if (allowed.value && (k === '-' || k === '_' || e.code === 'NumpadSubtract')) { if (!e.repeat) void rate(-1) }
   else if (allowed.value && (k === 'n' || k === 'N')) { if (!e.repeat) void rate(0) }
@@ -406,19 +386,6 @@ onBeforeUnmount(() => {
 .deck__note { height: 36px; }
 .deck__hold { height: 36px; margin-left: auto; }
 .deck__hold.on, .deck__hold.on:hover { color: var(--bg); background: var(--gold); }
-
-.deck__vol { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px; }
-.deck__mute {
-  width: 28px;
-  height: 24px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--pink);
-  font-size: 16px;
-  cursor: pointer;
-}
-.deck__mute.on { color: var(--subtle); }
 
 .app__toast {
   --px-edge: var(--cyan);

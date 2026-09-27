@@ -43,7 +43,6 @@ function noteText(s: string): string {
 }
 
 const CONTROLS_KEY = 'radio.controls'
-const VOLUME_KEY = 'radio.volume'
 
 function restoreControls(): Controls {
   const saved = load<Partial<Controls>>(CONTROLS_KEY, {})
@@ -61,8 +60,6 @@ function restoreControls(): Controls {
 }
 
 const controls = reactive<Controls>(restoreControls())
-const volume = ref<number>(Math.min(1, Math.max(0, Number(load<number>(VOLUME_KEY, 0.8)) || 0)))
-const muted = ref(false)
 const playing = ref(false)
 const started = ref(false)
 const composed = shallowRef<Landscape[]>([])
@@ -116,22 +113,6 @@ function set(patch: Partial<Controls>): void {
   save(CONTROLS_KEY, { ...controls })
 }
 
-function applyVolume(): void {
-  player?.setVolume(muted.value ? 0 : volume.value)
-}
-
-function setVolume(v: number): void {
-  volume.value = Math.min(1, Math.max(0, v))
-  if (volume.value > 0) muted.value = false
-  save(VOLUME_KEY, volume.value)
-  applyVolume()
-}
-
-function toggleMute(): void {
-  muted.value = !muted.value
-  applyVolume()
-}
-
 /** Start or resume. Call straight from a user gesture. Returns the player's stream, if any, for the <audio> element. */
 function play(): Promise<void> {
   if (!createPlayer) return Promise.reject(new Error('audio player not available'))
@@ -144,7 +125,6 @@ function play(): Promise<void> {
     player = createPlayer(conductor)
     player.onBar(b => { for (const cb of barListeners) cb(b) })
   }
-  applyVolume()
   try {
     // Safari 17+: play as media (through the silent switch), not as a UI sound.
     const nav = navigator as Navigator & { audioSession?: { type: string } }
@@ -282,8 +262,6 @@ function setComposed(list: Landscape[]): void {
 export function useRadio() {
   return {
     controls,
-    volume,
-    muted,
     playing,
     started,
     landscapes,
@@ -295,8 +273,6 @@ export function useRadio() {
     hasPlayer: !!createPlayer,
     intensityNames: INTENSITY_NAMES,
     set,
-    setVolume,
-    toggleMute,
     play,
     pause,
     tick,
