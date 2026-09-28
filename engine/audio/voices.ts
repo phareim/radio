@@ -603,23 +603,29 @@ const bassSub: Patch = (v, midi, at, dur, vel, _o, pan) => {
   return done(n, dur, { peak: LEVEL['bass.sub'] * velAmp(vel), a: 0.015, d: 0.4, s: 0.9, r: 0.09 })
 }
 
-/** Synthwave eighths: saw and square in unison, a sub underneath, a quick filter snap. */
+/** Synthwave eighths: two detuned saws and a square, a sine on the note and a sub under it, a quick filter snap. */
 const bassPluck: Patch = (v, midi, at, dur, vel, _o, pan) => {
   const n = begin(v.res, at, v.out.input, pan)
   const f = hz(midi)
-  const a = osc(n, 'sawtooth', f)
+  const a = osc(n, 'sawtooth', f, -7)
+  const a2 = osc(n, 'sawtooth', f, 7)
   const b = osc(n, 'square', f, 5)
-  const bg = gain(n.ac, 0.5)
+  const bg = gain(n.ac, 0.4)
   b.connect(bg)
-  const lp = filter(n.ac, 'lowpass', 2000, 3.5)
-  a.connect(lp); bg.connect(lp)
-  sweep(n, lp, 2400 * (0.55 + 0.55 * vel), 300, 0.07)
+  const lp = filter(n.ac, 'lowpass', 2000, 2.6)
+  a.connect(lp); a2.connect(lp); bg.connect(lp)
+  sweep(n, lp, 2200 * (0.55 + 0.55 * vel), 260, 0.09)
+  // The weight: a sine on the note itself (audible on small speakers) and a sub an octave down.
+  const body = osc(n, 'sine', f)
+  const bodyG = gain(n.ac, 0.7)
+  body.connect(bodyG)
+  bodyG.connect(n.amp)
   const sub = osc(n, 'sine', f / 2)
-  const subG = gain(n.ac, 0.4)
+  const subG = gain(n.ac, 0.6)
   sub.connect(subG)
   subG.connect(n.amp)
   lp.connect(n.amp)
-  return done(n, dur, { peak: LEVEL['bass.pluck'] * velAmp(vel), a: 0.002, d: 0.16, s: 0.5, r: 0.04 })
+  return done(n, dur, { peak: LEVEL['bass.pluck'] * 0.72 * velAmp(vel), a: 0.002, d: 0.2, s: 0.6, r: 0.05 })
 }
 
 /** DX bass: 1:1 FM with a fast-decaying index, plus a sine sub. */
