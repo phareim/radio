@@ -9,7 +9,10 @@ import { createRng } from '../engine/rng.ts'
 import { parseToken } from '../engine/theory.ts'
 import { noteName } from '../engine/piece/notation.ts'
 import { mapPitch } from '../engine/written.ts'
-import type { BarPlan, Controls, Landscape, Layer } from '../engine/types.ts'
+import { ANALOG, ANALOG_KITS, CHIP, CHIP_KITS, eraKit, eraVoice, HANDOVER } from '../engine/palette.ts'
+import { KIT_IDS, VOICE_IDS } from '../engine/catalog.ts'
+import { LAYERS } from '../engine/types.ts'
+import type { BarPlan, Controls, KitId, Landscape, Layer, VoiceId } from '../engine/types.ts'
 
 const lookup = (id: string) => LANDSCAPES[id]
 
@@ -47,7 +50,7 @@ test('random sessions stay in range and never throw', () => {
       if (k === 0) return { landscape: r.pick(ids) }
       if (k === 1) return { intensity: r.int(5) as Controls['intensity'] }
       if (k === 2) return { mood: r.next() }
-      if (k === 3) return { density: r.next(), space: r.next(), grit: r.next() }
+      if (k === 3) return { density: r.next(), space: r.next(), era: r.next() }
       if (k === 4) return { tempo: r.range(-20, 20) }
       return { hold: r.chance(0.5) }
     })
@@ -128,8 +131,9 @@ test('hold loops the section exactly', () => {
 
 test('built-in landscapes plan exactly as pinned', () => {
   // SHA-256 of the plans over scripted sessions on every built-in (last set
-  // for engine 1.2.0: phrase shapes, orchestration, long crossings): a
-  // landscape without `written` must plan byte for byte the same.
+  // for engine 1.3.0: Era replaces Grit, so the sessions turn Era and the
+  // plans carry its voices and crush; at era 0.5 they match 1.2.0 apart
+  // from fx): a landscape without `written` must plan byte for byte the same.
   // Change the hash only for a deliberate change to the composer or conductor.
   const h = createHash('sha256')
   const ids = BUILTIN.map(l => l.id)
@@ -140,13 +144,13 @@ test('built-in landscapes plan exactly as pinned', () => {
       if (r.chance(0.04)) {
         const k = r.int(6)
         c.setControls(k === 0 ? { landscape: r.pick(ids) } : k === 1 ? { intensity: r.int(5) as Controls['intensity'] }
-          : k === 2 ? { mood: r.next() } : k === 3 ? { density: r.next(), space: r.next(), grit: r.next() }
+          : k === 2 ? { mood: r.next() } : k === 3 ? { density: r.next(), space: r.next(), era: r.next() }
             : k === 4 ? { tempo: r.range(-20, 20) } : { hold: r.chance(0.5) })
       }
       h.update(JSON.stringify(c.nextBar()))
     }
   }
-  assert.equal(h.digest('hex'), '74695bc51926034bd3e75bea72d4d6ac7be3cb289b90b03e5e8d5d6a5b180f10')
+  assert.equal(h.digest('hex'), '5740fb352a2c93e7b04f5669e65fc14c5f1fa0054e31a118ff0f3499ac3391ff')
 })
 
 /**
@@ -449,4 +453,113 @@ test('the bass walks into the next section', () => {
     assert.ok(tail.length >= 2, `bar ${p.index}: no walk`)
     for (let i = 1; i < tail.length; i++) assert.ok(tail[i]!.midi > tail[i - 1]!.midi, `bar ${p.index}: the walk goes up`)
   }
+})
+
+// ---- era ----------------------------------------------------------------------
+
+const CHIP_VOICES = new Set<VoiceId>(Object.values(CHIP))
+const ACOUSTIC_VOICES = new Set<VoiceId>(Object.values(ANALOG))
+
+test('the era tables cover every voice and kit, and each end is where it stays', () => {
+  const sorted = (xs: string[]) => [...xs].sort()
+  for (const t of [CHIP, ANALOG]) {
+    assert.deepEqual(sorted(Object.keys(t)), sorted(VOICE_IDS))
+    for (const v of Object.values(t)) assert.ok(VOICE_IDS.includes(v), v)
+    for (const v of VOICE_IDS) assert.equal(t[t[v]], t[v], `${v} → ${t[v]} moves again`)
+  }
+  for (const t of [CHIP_KITS, ANALOG_KITS]) {
+    assert.deepEqual(sorted(Object.keys(t)), sorted(KIT_IDS))
+    for (const k of KIT_IDS) assert.equal(t[t[k]], t[k])
+  }
+  for (const v of ['chip.lead', 'chip.bass', 'chip.pad', 'chip.bell', 'arp.square', 'lead.pulse'] as VoiceId[]) assert.equal(CHIP[v], v)
+  assert.deepEqual([...CHIP_VOICES].sort(), ['arp.square', 'chip.bass', 'chip.bell', 'chip.lead', 'chip.pad', 'lead.pulse'])
+  for (const l of LAYERS) assert.ok(HANDOVER[l] > 0 && HANDOVER[l] <= 1)
+})
+
+test('era 0.5 maps every voice and kit to itself; the ends map every layer', () => {
+  for (const l of LAYERS) {
+    for (const v of VOICE_IDS) {
+      assert.equal(eraVoice(v, l, 0.5), v)
+      assert.ok(CHIP_VOICES.has(eraVoice(v, l, 0)), `${l} ${v} at 0`)
+      assert.ok(ACOUSTIC_VOICES.has(eraVoice(v, l, 1)), `${l} ${v} at 1`)
+    }
+    for (const k of KIT_IDS) {
+      assert.equal(eraKit(k, l, 0.5), k)
+      assert.equal(eraKit(k, l, 0), 'kit.chip')
+      assert.ok(['kit.acoustic', 'kit.brush', 'kit.tribal'].includes(eraKit(k, l, 1)))
+    }
+  }
+  // Layer by layer: beds first, the lead last.
+  assert.equal(eraVoice('pad.saw', 'pad', 0.4), 'chip.pad')
+  assert.equal(eraVoice('lead.square', 'lead', 0.4), 'lead.square')
+  assert.equal(eraVoice('lead.square', 'lead', 0.1), 'lead.square')
+  assert.equal(eraVoice('lead.square', 'lead', 0.05), 'chip.lead')
+  assert.equal(eraVoice('bass.saw', 'bass', 0.8), 'bass.saw')
+  assert.equal(eraVoice('bass.saw', 'bass', 0.9), 'bass.finger')
+  // A counter line stays apart from the chip lead; an arp becomes the chip arp.
+  assert.equal(eraVoice('mallet.kalimba', 'counter', 0), 'lead.pulse')
+  assert.equal(eraVoice('mallet.marimba', 'arp', 0), 'arp.square')
+})
+
+test('at either end of Era every layer plays its chip or acoustic counterpart from the next phrase', () => {
+  const ends: Array<[number, (v: VoiceId) => boolean, (k: KitId) => boolean]> = [
+    [0, v => CHIP_VOICES.has(v), k => k === 'kit.chip'],
+    [1, v => ACOUSTIC_VOICES.has(v), k => ['kit.acoustic', 'kit.brush', 'kit.tribal'].includes(k)],
+  ]
+  for (const [era, voiceOk, kitOk] of ends) for (const L of BUILTIN) {
+    const plans = run(3, 40, i => (i === 3 ? { era } : null), { landscape: L.id, intensity: 4 })
+    const start = plans.findIndex((p, i) => i > 3 && p.meta.phraseBar === 0)
+    let notes = 0
+    for (const p of plans.slice(start)) {
+      for (const n of p.notes) { notes++; assert.ok(voiceOk(n.voice), `${L.id} era ${era} bar ${p.index}: ${n.layer} on ${n.voice}`) }
+      for (const d of p.drums) assert.ok(kitOk(d.kit), `${L.id} era ${era} bar ${p.index}: ${d.layer} on ${d.kit}`)
+    }
+    assert.ok(notes > 100)
+  }
+})
+
+test('Era changes voices only at a phrase start; its fx move at once', () => {
+  const base = run(5, 24, () => null, { landscape: 'coast', intensity: 4 })
+  const turned = run(5, 24, i => (i === 11 ? { era: 0 } : null), { landscape: 'coast', intensity: 4 })
+  assert.equal(base[16]!.meta.phraseBar, 0)
+  for (let i = 11; i < 16; i++) {
+    assert.deepEqual(turned[i]!.notes, base[i]!.notes, `bar ${i}`)
+    assert.deepEqual(turned[i]!.drums, base[i]!.drums, `bar ${i}`)
+  }
+  assert.equal(turned[11]!.fx.crush, 1)
+  assert.equal(turned[11]!.fx.grit, 0)
+  assert.equal(base[11]!.fx.crush, 0)
+  assert.ok(turned[16]!.notes.every(n => CHIP_VOICES.has(n.voice)))
+  assert.deepEqual(turned[16]!.notes.map(n => [n.layer, n.midi, n.step]), base[16]!.notes.map(n => [n.layer, n.midi, n.step]), 'the same music')
+})
+
+test('Era leaves the music alone: back in the middle, the plan is the one it would have been', () => {
+  const seq = [0, 1, 0.3, 0.5, 0.9, 0.5]
+  const base = run(8, 8 * seq.length, () => null, { landscape: 'village', intensity: 4 })
+  const moved = run(8, 8 * seq.length, i => (i % 8 === 0 ? { era: seq[i / 8]! } : null), { landscape: 'village', intensity: 4 })
+  for (const i of [24, 25, 31, 40, 47]) {
+    assert.deepEqual(moved[i]!.notes, base[i]!.notes, `bar ${i}`)
+    assert.deepEqual(moved[i]!.drums, base[i]!.drums, `bar ${i}`)
+  }
+  assert.notDeepEqual(moved[8]!.notes, base[8]!.notes)
+  assert.deepEqual(LANDSCAPES.village, BUILTIN.find(l => l.id === 'village'))
+})
+
+test('chip.pad notes know their place in the chord', () => {
+  const plans = run(2, 32, () => null, { landscape: 'coast', intensity: 3, era: 0 })
+  let chords = 0
+  for (const p of plans) {
+    const groups = new Map<string, typeof p.notes>()
+    for (const n of p.notes) {
+      if (n.voice !== 'chip.pad') { assert.equal(n.opts?.chord, undefined); continue }
+      const k = `${n.layer}@${n.step}`
+      groups.set(k, [...(groups.get(k) ?? []), n])
+    }
+    for (const g of groups.values()) {
+      const byPitch = [...g].sort((a, b) => a.midi - b.midi)
+      byPitch.forEach((n, i) => assert.deepEqual(n.opts?.chord, [i, g.length], `bar ${p.index}`))
+      if (g.length > 1) chords++
+    }
+  }
+  assert.ok(chords > 4, `${chords} chords`)
 })

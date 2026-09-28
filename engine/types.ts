@@ -283,7 +283,7 @@ export interface FxSpec {
   reverbSize: number
   /** Master low-pass tone 0 (dark) .. 1 (open). */
   tone: number
-  /** 0..1 tape saturation and wow at the default Grit setting. */
+  /** 0..1 tape saturation and wow with Era in the middle. */
   grit: number
   /** Kick ducks pads and drones this much (0..1): the synthwave pump. */
   pump?: number

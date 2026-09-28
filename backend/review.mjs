@@ -29,8 +29,8 @@ function safeParse(s) {
   try { return JSON.parse(s); } catch { return {}; }
 }
 
-/** One compact line per feedback item. */
-function feedbackLine(f) {
+/** One compact line per feedback item. Older items carry `grit` (the tape knob Era replaced) instead of `era`. */
+export function feedbackLine(f) {
   const s = f.snapshot ?? {};
   const c = s.controls ?? {};
   return JSON.stringify({
@@ -43,7 +43,8 @@ function feedbackLine(f) {
     mood: c.mood,
     density: c.density,
     space: c.space,
-    grit: c.grit,
+    era: c.era,
+    grit: c.era === undefined ? c.grit : undefined,
     tempo: c.tempo,
     hold: c.hold || undefined,
     key: s.key,
@@ -87,7 +88,7 @@ export function buildReviewPrompt(db, items, date) {
     `You are the composer and record producer behind a generative radio: Petter's background music for working, an electronic semi-retro game soundtrack in the vein of Neon Shrine. Below is listener feedback (thumbs up/down, comments) with a snapshot of what was playing at the moment of each press, the sources of the landscapes involved, and the engine's design notes. Find what the feedback says and turn it into concrete edits.`,
     `## Engine notes (docs/engine.md)\n\n${readDoc('docs/engine.md').trim()}`,
     `## Tallies\n\nPer landscape:\n\n| landscape | up | down | comments |\n|---|---|---|---|\n${tally(items, (f) => f.landscape)}\n\nPer intensity (0 STILL … 4 SURGE):\n\n| intensity | up | down | comments |\n|---|---|---|---|\n${tally(items, (f) => f.snapshot?.controls?.intensity ?? '?')}`,
-    `## Feedback (${items.length} items, one JSON per line, oldest first)\n\n${items.map(feedbackLine).join('\n')}`,
+    `## Feedback (${items.length} items, one JSON per line, oldest first)\n\nKnobs are 0..1: mood bright..dark, density sparse..busy, space dry..vast, era 8-bit..analog (0.5 is the landscape as written; away from it the layers hand over to chip voices or acoustic instruments). Older items have \`grit\` (clean..tape, the knob Era replaced) instead of \`era\`.\n\n${items.map(feedbackLine).join('\n')}`,
     `## Landscape sources\n\n${landscapeSources(db, ids)}`,
     `## Your report
 

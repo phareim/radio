@@ -24,7 +24,7 @@ components/
   StationDial.vue          the channels shown (1–0), then CHANNELS
   ChannelsDialog.vue       show/hide each channel, remove your own, + NEW PLACE
   IntensityBar.vue         STILL … SURGE
-  PxSlider.vue             segmented knobs (mood, space, grit, density, tempo)
+  PxSlider.vue             segmented knobs (mood, space, era, density, tempo)
   LayerStrip.vue           the ten layers lit by level, entries counting down
   CommentBox.vue           words after ▲ / ▼ / NOTE
   ComposeDialog.vue        ask Opus for a place, wait for the job

@@ -30,7 +30,7 @@ function visual(m: CoverMood): VisualState {
     index: 0, bpmStart: 100, bpmEnd: 100, swing: 0,
     chords: [{ from: 0, len: 16, chord: { root: m.tonic, bass: m.tonic, tones: [0, 7], symbol: '', degree: '' } }],
     key: { tonic: m.tonic, mode: m.mode }, scale: [], notes: [], drums: [], mix: {},
-    fx: { reverb: 0, delay: 0, reverbSize: 2, tone: 1, grit: 0, pump: 0, width: 1 },
+    fx: { reverb: 0, delay: 0, reverbSize: 2, tone: 1, grit: 0, crush: 0, pump: 0, width: 1 },
     ambience: {}, ambienceFadeBars: 1,
     meta: {
       landscape: m.landscape,

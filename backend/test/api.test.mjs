@@ -55,7 +55,7 @@ async function api(method, path, body, { key = KEY, headers = {}, user = USER } 
 
 const snapshot = (landscape, intensity = 2) => ({
   landscape,
-  controls: { landscape, intensity, mood: 0.5, space: 0.5, grit: 0.3, density: 0.5, tempo: 0, hold: false },
+  controls: { landscape, intensity, mood: 0.5, space: 0.5, era: 0.5, density: 0.5, tempo: 0, hold: false },
   bar: 42, key: 'D mixolydian', chords: ['D', 'C'], section: 'A', seed: 7, engineVersion: 'test',
   active: ['pad', 'bass', 'drums'], transition: 'none',
 });

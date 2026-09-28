@@ -9,7 +9,7 @@ Opus does; Opus can also compose new landscapes.
 
 | Part | Where | Docs |
 |---|---|---|
-| Engine (pure TS: theory, composer, conductor, landscapes) | `engine/` | `docs/engine.md` |
+| Engine (pure TS: theory, composer, conductor, Era palette, landscapes) | `engine/` | `docs/engine.md` |
 | Audio (Web Audio player, voices, drums, ambience, fx) | `engine/audio/` | `docs/engine.md` (player) |
 | Pixel scenes, one per landscape | `scene/` | `docs/landscapes.md` |
 | Pieces for jam (format, notation, piece conductor, landscape derivation, growing, pattern library) | `engine/piece/` | `docs/piece.md` |

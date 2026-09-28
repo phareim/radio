@@ -293,6 +293,7 @@ function cases(filter: string, wavAll: boolean): Case[] {
       conductor: () => createConductor({ lookup: x => LANDSCAPES[x], seed: 7, controls: { landscape: id, intensity: 4 } }),
     })
   }
+  out.push(...eraCases(wavAll))
   // Opt-in (filter 'long'): ten minutes of a landscape with a control change, for queue growth and node counts.
   out.push({
     group: 'long', name: 'coast-10min', seconds: 600, from: 30, visual: true,
@@ -571,4 +572,42 @@ window.runAudioCheck = async (filter: string, wavAll: boolean) => {
   if (tie !== 'ok') console.error(`ties: ${tie}`)
   for (const c of cases(filter, wavAll)) rows.push(await render(c))
   return rows
+}
+
+/**
+ * Era: a few landscapes at the 8-bit end, the middle and the analog end (the
+ * same seed as the landscape group), and one sweep across the knob so the
+ * crush and tape glide under the music.
+ */
+function eraCases(wavAll: boolean): Case[] {
+  const out: Case[] = []
+  const at = (id: string, era: number, seed = 7) => createConductor({ lookup: x => LANDSCAPES[x], seed, controls: { landscape: id, intensity: 4, era } })
+  for (const id of ['coast', 'village', 'deepspace', 'caverns']) {
+    for (const [name, era] of [['8bit', 0], ['mid', 0.5], ['analog', 1]] as const) {
+      out.push({ group: 'era', name: `${id}:${name}`, seconds: 50, from: 22, wav: wavAll, visual: true, conductor: () => at(id, era) })
+    }
+  }
+  // The crush alone: the full mix with crush off and full, everything else the same.
+  for (const crush of [0, 1]) {
+    out.push({
+      group: 'era', name: `crush:${crush}`, seconds: 24, from: 2, wav: wavAll,
+      conductor: () => { const c = fullMix(); return { ...c, nextBar: (): BarPlan => { const p = c.nextBar(); return { ...p, fx: { ...p.fx, crush } } } } },
+    })
+  }
+  out.push({
+    group: 'era', name: 'nightdrive:sweep', seconds: 60, from: 8, wav: wavAll, visual: true,
+    conductor: () => {
+      const c = at('nightdrive', 0.5, 4)
+      const steps = [0.5, 0.3, 0, 0.2, 0.5, 0.8, 1, 0.6, 0.5]
+      let n = 0
+      const next = c.nextBar.bind(c)
+      c.nextBar = () => {
+        if (n % 3 === 0) c.setControls({ era: steps[Math.floor(n / 3) % steps.length]! })
+        n++
+        return next()
+      }
+      return c
+    },
+  })
+  return out
 }

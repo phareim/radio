@@ -19,6 +19,11 @@ intensity 0..4 (STILL, DRIFT, CRUISE, DRIVE, SURGE); layers enter as intensity
 rises, so every per-intensity array must make musical sense on its own:
 level 0 is near-ambient, level 4 is the full band.`;
 
+/** For prompts that compose a whole landscape (not jam's parts, which the Era knob leaves alone). */
+export const ERA_NOTE = `The listener's Era knob hands the layers over to chip voices (8-bit) or
+acoustic instruments (analog) by itself; compose for its middle, where the
+landscape plays as written.`;
+
 function pickExamples(LANDSCAPES, base) {
   const ids = Object.keys(LANDSCAPES);
   const order = [...EXAMPLE_PREFERENCE.filter((id) => ids.includes(id)), ...ids];
@@ -42,7 +47,7 @@ export function buildComposePrompt({ prompt, base, LANDSCAPES, SCENES = Object.k
   const examples = pickExamples(LANDSCAPES, base);
   const parts = [
     'You are composing a new landscape for a generative radio: one JSON object that the engine plays.',
-    `## Musical intent\n\n${INTENT}`,
+    `## Musical intent\n\n${INTENT}\n\n${ERA_NOTE}`,
     `## The schema (TypeScript, from engine/types.ts)\n\n\`\`\`ts\n${landscapeSchema()}\n\`\`\``,
     ...validatorPart(),
     `## Built-in landscapes as examples\n\n${examples

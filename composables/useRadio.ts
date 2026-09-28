@@ -52,7 +52,8 @@ function restoreControls(): Controls {
   c.intensity = Math.round(n(saved.intensity, 0, 4, c.intensity)) as Controls['intensity']
   c.mood = n(saved.mood, 0, 1, c.mood)
   c.space = n(saved.space, 0, 1, c.space)
-  c.grit = n(saved.grit, 0, 1, c.grit)
+  // An old saved `grit` (the knob Era replaced) is ignored: Era starts in the middle.
+  c.era = n(saved.era, 0, 1, c.era)
   c.density = n(saved.density, 0, 1, c.density)
   c.tempo = Math.round(n(saved.tempo, -20, 20, c.tempo))
   c.hold = saved.hold === true
@@ -169,7 +170,7 @@ function idleVisual(now: number): VisualState {
     index: 0, bpmStart: L.bpm, bpmEnd: L.bpm, swing: 0,
     chords: [{ from: 0, len: 16, chord: { root: L.tonic, bass: L.tonic, tones: [0, 7], symbol: '', degree: '' } }],
     key, scale: [], notes: [], drums: [], mix: {},
-    fx: { reverb: 0, delay: 0, reverbSize: 2, tone: 1, grit: 0, pump: 0, width: 1 },
+    fx: { reverb: 0, delay: 0, reverbSize: 2, tone: 1, grit: 0, crush: 0, pump: 0, width: 1 },
     ambience: {}, ambienceFadeBars: 1,
     meta: {
       landscape: L.id,

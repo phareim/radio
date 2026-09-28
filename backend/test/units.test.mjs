@@ -4,7 +4,7 @@ import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseJsonObject, slugify } from '../compose.mjs';
-import { extractSummary } from '../review.mjs';
+import { extractSummary, feedbackLine } from '../review.mjs';
 import { loadEnv } from '../lib/env.mjs';
 import { allowedPaths, factoryName, parsePorcelainZ, paintOwners, startPaint, buildPaintPrompt } from '../paint.mjs';
 
@@ -26,6 +26,16 @@ test('extractSummary reads the Summary section', () => {
   const md = '# Radio review\n\n## Summary\n\nOne.\nTwo.\n\n## Patterns\n\n- x\n';
   assert.equal(extractSummary(md), 'One. Two.');
   assert.equal(extractSummary('## Summary\nOnly this.'), 'Only this.');
+});
+
+test('feedbackLine reports era, or grit on feedback from before Era', () => {
+  const line = (controls) => JSON.parse(feedbackLine({ id: 1, rating: 1, landscape: 'coast', snapshot: { controls } }));
+  const now = line({ intensity: 2, era: 0.2 });
+  assert.equal(now.era, 0.2);
+  assert.ok(!('grit' in now));
+  const old = line({ intensity: 2, grit: 0.3 });
+  assert.equal(old.grit, 0.3);
+  assert.ok(!('era' in old));
 });
 
 test('loadEnv overrides what is already set', () => {

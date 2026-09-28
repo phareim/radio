@@ -94,7 +94,7 @@ function visual(now: number): VisualState {
     notes: [],
     drums: [],
     mix: {},
-    fx: { reverb: 0, delay: 0, reverbSize: 2, tone: 1, grit: 0, pump: 0, width: 1 },
+    fx: { reverb: 0, delay: 0, reverbSize: 2, tone: 1, grit: 0, crush: 0, pump: 0, width: 1 },
     ambience: {},
     ambienceFadeBars: 1,
     meta: {

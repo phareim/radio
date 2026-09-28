@@ -10,8 +10,8 @@
  *   pivots the harmony into the new key while tempo, effects, ambience and
  *   the painted scene glide across. The new place arrives with pad and
  *   drone and builds back up to the chosen intensity.
- * - Mood changes the mode at the next phrase; density too. Tempo glides
- *   across a phrase.
+ * - Mood changes the mode at the next phrase; density and Era's voices
+ *   too. Tempo glides across a phrase.
  * - Left alone, the music has form: sections A, A2, B, A over the
  *   landscape's progressions, and now and then a phrase where the drums and
  *   lead step out to breathe.
@@ -32,6 +32,7 @@ import type { ParsedToken } from './theory.ts'
 import { composeBar, makeMotif, newMemory, varyMotif } from './composer.ts'
 import type { Motif, PhraseShape } from './composer.ts'
 import { orchestrate } from './orchestra.ts'
+import { eraBar } from './palette.ts'
 import type { Orchestration } from './orchestra.ts'
 import { DEFAULT_QUOTE, preparedWritten, WRITTEN_BARS, writtenBar, writtenSpans } from './written.ts'
 import type { PreparedPhrase } from './written.ts'
@@ -126,19 +127,22 @@ export function modeFor(L: Landscape, mood: number): Mode {
 }
 
 /**
- * A landscape's effects shaped by the Space, Grit and Mood knobs. The pump
- * only works while drums sound.
+ * A landscape's effects shaped by the Space, Era and Mood knobs. The pump
+ * only works while drums sound. Era's middle keeps the landscape's tape;
+ * toward 8-bit the tape goes and bit crush comes in (gently over the first
+ * stretch), toward analog the tape deepens.
  */
 export function shapeFx(f: FxSpec, controls: Pick<Controls, 'space' | 'era' | 'mood'>, drums: boolean): FxState {
   const space = controls.space
+  const chip = Math.max(0, Math.min(1, (0.5 - controls.era) * 2))
+  const analog = Math.max(0, Math.min(1, (controls.era - 0.5) * 2))
   return {
     reverb: Math.min(1, f.reverb * (0.35 + 1.3 * space)),
     delay: Math.min(1, f.delay * (0.35 + 1.3 * space)),
     reverbSize: f.reverbSize * (0.65 + 0.7 * space),
     tone: Math.max(0.05, Math.min(1, f.tone * (1.08 - 0.16 * controls.mood))),
-    // STUB: Era's fx curve (tape toward analog, crush toward 8-bit) comes with the palette.
-    grit: Math.min(1, f.grit * 0.4 + 0.225),
-    crush: 0,
+    grit: Math.min(1, (f.grit * 0.4 + 0.225) * (1 - chip) + 0.5 * analog),
+    crush: chip * chip,
     pump: (f.pump ?? 0) * (drums ? 1 : 0),
     width: 0.55 + 0.45 * space,
   }
@@ -194,6 +198,8 @@ export function createConductor(opts: ConductorOptions): Conductor {
   let phraseBars: number = L.phraseBars ?? 8
   let key: Key = { tonic: L.tonic, mode: modeFor(L, controls.mood) }
   let density = controls.density
+  /** Era as the voices hear it: latched at phrase starts, so no one changes instrument mid-phrase. */
+  let era = controls.era
   let present = new Set<Layer>(['ambience'])
   let schedule: Scheduled[] = []
   let move: LandscapeMove | null = null
@@ -579,11 +585,13 @@ export function createConductor(opts: ConductorOptions): Conductor {
     const left = new Set<Layer>()
 
     // Landscape arrival happens on the bar after the bridge.
-    if (move && b === move.bridgeStart + move.bridgeBars) for (const l of arrive(move)) entered.add(l)
+    const arriving = !!move && b === move.bridgeStart + move.bridgeBars
+    if (arriving) for (const l of arrive(move!)) entered.add(l)
 
     // New phrase?
     const phraseStartsHere = b === phraseStart + phraseBars || (b === phraseStart && b === 0)
     if (b === phraseStart + phraseBars) phraseStart = b
+    if (phraseStartsHere || arriving) era = controls.era
     let sectionStart = b === 0
     if (b === 0) { freshTheme(true); section = newSection('A', 0) }
     if (phraseStartsHere && b > 0 && !(move && b >= move.bridgeStart)) {
@@ -724,6 +732,9 @@ export function createConductor(opts: ConductorOptions): Conductor {
       notes = [...notes.filter(n => !quoting.layers.has(n.layer)), ...w.notes]
       drumHits = [...drumHits.filter(d => !quoting.layers.has(d.layer)), ...w.drums]
     }
+
+    // Era: layers that have handed over play their chip or acoustic counterpart.
+    ;({ notes, drums: drumHits } = eraBar(notes, drumHits, era))
 
     // Mix: entering layers swell or start on the beat; leaving ones die away.
     const mix: BarPlan['mix'] = {}

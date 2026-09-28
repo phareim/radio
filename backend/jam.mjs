@@ -11,7 +11,7 @@
 import { loadPieceEngine, landscapeSchema, pieceNotation, trackType, soundTypes } from './lib/engine.mjs';
 import { askOpus } from './lib/opus.mjs';
 import { now } from './lib/db.mjs';
-import { INTENT, validatorPart, parseJsonObject, generateLandscape } from './compose.mjs';
+import { ERA_NOTE, INTENT, validatorPart, parseJsonObject, generateLandscape } from './compose.mjs';
 
 const PC = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
 const isObj = (x) => typeof x === 'object' && x !== null && !Array.isArray(x);
@@ -264,7 +264,7 @@ Copy \`written\` unchanged: the same phrases in the same order, every part and b
 export function buildChannelPrompt({ piece, draft, brief, E }) {
   return [
     'You are turning a piece from jam (Petter\'s instrument on the radio\'s engine) into a channel for his generative radio: one Landscape JSON object that the engine plays for hours.',
-    `## Musical intent\n\n${INTENT}`,
+    `## Musical intent\n\n${INTENT}\n\n${ERA_NOTE}`,
     `## The schema (TypeScript, from engine/types.ts)\n\n${fence('ts', landscapeSchema())}`,
     ...validatorPart(),
     `## The piece\n\n${pieceSummary(piece)}\n\n${fence('ts', pieceNotation())}\n\n${fence('json', pieceJson(piece))}`,
