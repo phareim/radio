@@ -43,7 +43,7 @@ All JSON. Everything except `GET /health` needs `Authorization: Bearer $RADIO_AP
 | POST | `/compose` | `{prompt, base?: built-in id}` | 202 `{job}` |
 | POST | `/review` | | 202 `{job}` |
 | GET | `/reviews` | | `{reviews: [{id, at, feedbackFrom, feedbackTo, path, summary}]}` |
-| GET | `/jobs/:id` | | `{job: {id, kind, status, result, error, createdAt, finishedAt}}`; only the member who started it (404 otherwise), review jobs to the owner only |
+| GET | `/jobs/:id` | | `{job: {id, kind, status, result, error, createdAt, finishedAt}}`; only the member who started it (404 otherwise), ownerless jobs (reviews, old composes) to the owner only |
 | GET | `/jam/pieces` | | `{pieces: [{id, name, updatedAt, channel?}]}`, last saved first |
 | GET | `/jam/pieces/:id` | | `{piece, updatedAt}` |
 | PUT | `/jam/pieces/:id` | Piece (`engine/piece/types.ts`) | `{piece, updatedAt}`: the validated copy |

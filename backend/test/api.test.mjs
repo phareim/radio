@@ -195,6 +195,11 @@ test('jobs: only the owner sees a job, and never its input', async () => {
     .run(new Date().toISOString()).lastInsertRowid);
   assert.equal((await api('GET', `/jobs/${rv}`, null, { user: 'other@example.com' })).status, 404);
   assert.equal((await api('GET', `/jobs/${rv}`)).status, 200);
+  // So is a compose from before jobs had owners.
+  const old = Number(db.prepare(`INSERT INTO jobs (kind, status, input, created_at) VALUES ('compose', 'done', '{}', ?)`)
+    .run(new Date().toISOString()).lastInsertRowid);
+  assert.equal((await api('GET', `/jobs/${old}`, null, { user: `${'0'.repeat(32)}@guest` })).status, 404);
+  assert.equal((await api('GET', `/jobs/${old}`)).status, 200);
 });
 
 test('jobs: a restart runs what it left behind again, once', async () => {

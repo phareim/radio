@@ -256,10 +256,13 @@ export function createApp({ db, apiKey, corsOrigins = [], ask, paint = startPain
 
     ...jamRoutes({ db, jobs, HttpError, readJson, needListener }),
 
-    // A job is its owner's; review jobs have none and only the owner may follow them.
+    // A job is its owner's; jobs without one (reviews, and composes from before
+    // jobs had owners) only the owner (X-Radio-Owner) may follow.
     ['GET', /^\/jobs\/(\d+)$/, async (req, [, id]) => {
-      const job = jobs.get(Number(id), needListener(req));
-      if (!job || (job.kind === 'review' && !isOwner(req))) throw new HttpError(404, 'no such job');
+      const u = needListener(req);
+      const ownerless = db.prepare('SELECT owner IS NULL AS n FROM jobs WHERE id = ?').get(Number(id))?.n === 1;
+      const job = ownerless && !isOwner(req) ? null : jobs.get(Number(id), u);
+      if (!job) throw new HttpError(404, 'no such job');
       return { job };
     }],
   ];
