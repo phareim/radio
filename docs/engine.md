@@ -208,12 +208,27 @@ A texture missing from `BarPlan.ambience` fades to 0; a layer missing from
 - **Played instruments** (`instruments.ts`, renderers in `render.ts`):
   `keys.piano`, `keys.felt` (additive, stretched partials, two-stage unison
   decay, hammer knock, velocity → brightness), `guitar.nylon`, `guitar.steel`,
-  `guitar.mute`, `bass.finger` (Karplus-Strong in JS: a DelayNode loop cannot
-  be shorter than one 128-frame render quantum). Notes render once per voice,
+  `guitar.mute`, `bass.finger`, `bass.upright` (Karplus-Strong in JS: a
+  DelayNode loop cannot be shorter than one 128-frame render quantum),
+  `mallet.vibes` (a rendered bar through a shared motor tremolo). Notes render once per voice,
   pitch, velocity bucket and round-robin variant into an LRU cache of
   AudioBuffers (`res.bufs`, 12 M samples) and play through a gated VCA: they
   ring while held and damp on release. First press of a low piano key renders
   in up to ~60 ms; mid-range notes in 5–20 ms.
+- **Era voices** (in `voices.ts` unless named above; `engine/palette.ts`
+  picks them). The chip voices are NES channels: exactly in tune, unfiltered,
+  no grit spread; volume and vibrato step at the driver's 60 Hz frame rate.
+  `chip.lead` is a 25 % pulse (a 50 % square on accents) with a 4-bit stepped
+  envelope and a stepped vibrato from 0.25 s. `chip.bass` is the 32-step
+  triangle, one level for the whole note. `chip.pad` plays a chord as a
+  frame-rate arpeggio: `opts.chord = [index, count]` gives each note its
+  two-frame slot, gated by an oscillator rather than automation (so it never
+  ties); a note without a chord is a plain 12.5 % pulse. `chip.bell` is a
+  12.5 % blip with the NES echo 0.18 s later. The acoustic voices are
+  modelled: `strings.ensemble` is two sawtooth players per note with their own
+  late vibrato, bow noise and a shared body (levelled for 4-note chords; a
+  single line plays louder); `wind.flute` has harmonics, breath, a chiff and
+  a late vibrato. `kit.acoustic` is a kit in a small shared room.
 - **Live notes**: `player.live(layer, sound, vel, pan?)` plays a voice or a drum
   hit 5 ms from now on the layer's bus (a voice with a 30 s nominal length that
   `release()` ends; the glide lead slides while the previous live note is held).
