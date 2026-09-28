@@ -15,12 +15,14 @@ const VOICES: Record<VoiceId, true> = {
   'bell.glass': true, 'bell.fm': true, 'bell.chime': true, 'counter.strings': true, 'counter.soft': true,
   'drone.sub': true, 'drone.organ': true, 'drone.shimmer': true,
   'keys.piano': true, 'keys.felt': true, 'guitar.nylon': true, 'guitar.steel': true, 'guitar.mute': true, 'bass.finger': true,
+  'chip.lead': true, 'chip.bass': true, 'chip.pad': true, 'chip.bell': true,
+  'strings.ensemble': true, 'wind.flute': true, 'mallet.vibes': true, 'bass.upright': true,
 }
 export const VOICE_IDS = Object.keys(VOICES) as VoiceId[]
 
 const KITS: Record<KitId, true> = {
   'kit.synthwave': true, 'kit.soft': true, 'kit.tribal': true, 'kit.brush': true,
-  'kit.motorik': true, 'kit.heartbeat': true, 'kit.chip': true,
+  'kit.motorik': true, 'kit.heartbeat': true, 'kit.chip': true, 'kit.acoustic': true,
 }
 export const KIT_IDS = Object.keys(KITS) as KitId[]
 

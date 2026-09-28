@@ -9,7 +9,7 @@ import { DEFAULT_CONTROLS, LAYERS } from '../engine/types.ts'
 
 export const DORIAN_D = [2, 4, 5, 7, 9, 11, 0]
 
-export const FX: FxState = { reverb: 0.35, delay: 0.25, reverbSize: 2.5, tone: 0.75, grit: 0.2, pump: 0, width: 0.6 }
+export const FX: FxState = { reverb: 0.35, delay: 0.25, reverbSize: 2.5, tone: 0.75, grit: 0.2, crush: 0, pump: 0, width: 0.6 }
 
 interface Bar {
   notes?: NoteEvent[]

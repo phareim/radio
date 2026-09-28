@@ -129,14 +129,16 @@ export function modeFor(L: Landscape, mood: number): Mode {
  * A landscape's effects shaped by the Space, Grit and Mood knobs. The pump
  * only works while drums sound.
  */
-export function shapeFx(f: FxSpec, controls: Pick<Controls, 'space' | 'grit' | 'mood'>, drums: boolean): FxState {
+export function shapeFx(f: FxSpec, controls: Pick<Controls, 'space' | 'era' | 'mood'>, drums: boolean): FxState {
   const space = controls.space
   return {
     reverb: Math.min(1, f.reverb * (0.35 + 1.3 * space)),
     delay: Math.min(1, f.delay * (0.35 + 1.3 * space)),
     reverbSize: f.reverbSize * (0.65 + 0.7 * space),
     tone: Math.max(0.05, Math.min(1, f.tone * (1.08 - 0.16 * controls.mood))),
-    grit: Math.min(1, f.grit * 0.4 + controls.grit * 0.75),
+    // STUB: Era's fx curve (tape toward analog, crush toward 8-bit) comes with the palette.
+    grit: Math.min(1, f.grit * 0.4 + 0.225),
+    crush: 0,
     pump: (f.pump ?? 0) * (drums ? 1 : 0),
     width: 0.55 + 0.45 * space,
   }
@@ -556,7 +558,7 @@ export function createConductor(opts: ConductorOptions): Conductor {
     return {
       reverb: lerp(a.reverb, b.reverb, t), delay: lerp(a.delay, b.delay, t),
       reverbSize: lerp(a.reverbSize, b.reverbSize, t), tone: lerp(a.tone, b.tone, t),
-      grit: lerp(a.grit, b.grit, t), pump: lerp(a.pump, b.pump, t), width: lerp(a.width, b.width, t),
+      grit: lerp(a.grit, b.grit, t), crush: lerp(a.crush, b.crush, t), pump: lerp(a.pump, b.pump, t), width: lerp(a.width, b.width, t),
     }
   }
 

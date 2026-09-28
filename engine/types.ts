@@ -116,6 +116,16 @@ export type VoiceId =
   | 'guitar.steel'  // plucked steel string, brighter, more ring
   | 'guitar.mute'   // palm-muted pluck, short and percussive
   | 'bass.finger'   // fingered electric bass (plucked string, warm low end)
+  // chip voices: the 8-bit end of the Era knob (any layer may use them)
+  | 'chip.lead'     // NES pulse lead: square/pulse duty, delayed stepped vibrato, no filter
+  | 'chip.bass'     // NES triangle: the 4-bit stepped triangle, no envelope but the gate
+  | 'chip.pad'      // a chord as a frame-rate arpeggio: each note of the chord takes its turn (`opts.chord`)
+  | 'chip.bell'     // 12.5 % pulse blip with a short decay and a soft echo
+  // acoustic voices: the analog end of the Era knob (modelled, no samples)
+  | 'strings.ensemble' // bowed string section: sustained, slow bow attack, body resonances
+  | 'wind.flute'    // flute: breath chiff, soft harmonics, vibrato that comes in late
+  | 'mallet.vibes'  // vibraphone: struck bar partials, long ring, slow motor tremolo
+  | 'bass.upright'  // upright bass: plucked gut string, woody thump, short ring
 
 /** Drum kits: each maps the hit names below to a different synthesis. */
 export type KitId =
@@ -126,6 +136,7 @@ export type KitId =
   | 'kit.motorik'   // tight dry kick, tight snare, closed 16th hats
   | 'kit.heartbeat' // muffled low double-thump kick, almost no highs
   | 'kit.chip'      // NES noise-channel drums
+  | 'kit.acoustic'  // a real kit in a room: beater kick, wired snare, cymbals, toms
 
 /**
  * Drum hit names (one char, used in groove strings):
@@ -408,8 +419,13 @@ export interface Controls {
   mood: number
   /** 0 dry .. 1 vast: reverb and delay (glides). */
   space: number
-  /** 0 clean .. 1 worn tape (glides). */
-  grit: number
+  /**
+   * Era: 0 8-bit .. 0.5 the landscape as written .. 1 analog. Away from the
+   * middle the layers hand over, one by one at phrase starts, to chip voices
+   * (toward 0) or acoustic instruments (toward 1); the master chain crushes
+   * bits toward 0 and adds tape toward 1 (glides).
+   */
+  era: number
   /** 0 sparse .. 1 busy: note density, arp rate, ghost notes (phrase boundaries). */
   density: number
   /** Tempo nudge in bpm, -20..+20 (glides over a phrase). */
@@ -423,7 +439,7 @@ export const DEFAULT_CONTROLS: Controls = {
   intensity: 2,
   mood: 0.5,
   space: 0.5,
-  grit: 0.3,
+  era: 0.5,
   density: 0.5,
   tempo: 0,
   hold: false,
@@ -443,8 +459,8 @@ export interface NoteEvent {
   vel: number
   /** -1..1, default 0. */
   pan?: number
-  /** Voice-specific extras (e.g. arp.seq cutoff 0..1, lead.glide legato). */
-  opts?: { cutoff?: number; legato?: boolean }
+  /** Voice-specific extras (e.g. arp.seq cutoff 0..1, lead.glide legato, chip.pad's place in its chord). */
+  opts?: { cutoff?: number; legato?: boolean; chord?: [index: number, count: number] }
 }
 
 export interface DrumEvent {
@@ -469,7 +485,10 @@ export interface FxState {
   delay: number
   reverbSize: number
   tone: number
+  /** Tape saturation, wow and hiss 0..1. */
   grit: number
+  /** Bit crush 0..1 (the 8-bit side of Era). */
+  crush: number
   pump: number
   /** Stereo width 0..1. */
   width: number

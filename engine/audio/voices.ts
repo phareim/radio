@@ -40,6 +40,9 @@ const LEVEL: Record<Exclude<VoiceId, InstrumentId>, number> = {
   'bell.glass': 0.121, 'bell.fm': 0.108, 'bell.chime': 0.176,
   'counter.strings': 0.15, 'counter.soft': 0.107,
   'drone.sub': 0.0627, 'drone.organ': 0.0456, 'drone.shimmer': 0.0342,
+  // STUB: placeholders until the Era voices are built
+  'chip.lead': 0.176, 'chip.bass': 0.0875, 'chip.pad': 0.113, 'chip.bell': 0.176,
+  'strings.ensemble': 0.0699, 'wind.flute': 0.0865, 'mallet.vibes': 0.121, 'bass.upright': 0.0875,
 }
 
 // ---- helpers -----------------------------------------------------------------
@@ -778,6 +781,9 @@ const PATCHES: Record<VoiceId, Patch> = {
   'bell.glass': bellGlass, 'bell.fm': bellFm, 'bell.chime': bellChime,
   'counter.strings': counterStrings, 'counter.soft': counterSoft,
   'drone.sub': droneSub, 'drone.organ': droneOrgan, 'drone.shimmer': droneShimmer,
+  // STUB: placeholders until the Era voices are built
+  'chip.lead': leadPulse, 'chip.bass': bassRound, 'chip.pad': arpSquare, 'chip.bell': bellChime,
+  'strings.ensemble': padStrings, 'wind.flute': leadWhistle, 'mallet.vibes': bellGlass, 'bass.upright': bassRound,
   ...INSTRUMENTS,
 }
 

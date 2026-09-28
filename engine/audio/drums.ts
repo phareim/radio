@@ -448,12 +448,15 @@ const KITS: Record<KitId, Kit> = {
     x: { fn: h => noiseHit(h, { buf: h.v.res.nesLong, rate: 0.8, filters: [['highpass', 1500, 0.7], ['lowpass', 10000, 0.5]], decay: 0.3, lvl: 0.631 }), lvl: 0.16 },
     z: { fn: (h, _v, len) => riser(h, len, { buf: h.v.res.nesLong, from: 600, to: 8000, q: 1.2, lvl: 0.7, rate: 0.5 }), lvl: 0.2 },
   },
+  'kit.acoustic': {} as Kit, // STUB: plays kit.brush until the kit is built (below)
 }
+KITS['kit.acoustic'] = KITS['kit.brush']
 
 /** Per-kit loudness (linear), calibrated so each kit's groove sits at about -24 LUFS through the drums layer. */
 const KIT_GAIN: Record<KitId, number> = {
   'kit.synthwave': 0.266, 'kit.soft': 0.209, 'kit.tribal': 0.199, 'kit.brush': 0.224,
   'kit.motorik': 0.316, 'kit.heartbeat': 0.178, 'kit.chip': 0.295,
+  'kit.acoustic': 0.224, // STUB: kit.brush's until the kit is built
 }
 
 export const KIT_IDS = Object.keys(KITS) as KitId[]
