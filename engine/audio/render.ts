@@ -1,7 +1,7 @@
 /**
  * Note renderers for the played instruments (instruments.ts): plucked
- * strings by Karplus-Strong and pianos by additive synthesis, computed in JS
- * into sample arrays. Pure math, no Web Audio, so node tests cover it.
+ * strings by Karplus-Strong, pianos and vibraphone bars by additive
+ * synthesis, computed in JS into sample arrays. Pure math, no Web Audio, so node tests cover it.
  *
  * Why not in the audio graph: a Karplus-Strong loop needs a delay shorter
  * than one period (0.4 ms for a high E), and a feedback DelayNode cannot go
@@ -357,4 +357,87 @@ export function renderPiano(p: PianoSpec): Float32Array {
   }
   dcBlock(x, sr, 15)
   return finishNote(x, sr, 0.22, 0.95, 0.0008, Math.min(0.4, (len / sr) * 0.1))
+}
+
+// ---- vibraphone (additive) ----------------------------------------------------------------
+
+export interface BarSpec {
+  sr: number
+  midi: number
+  /** Velocity 0..1: mallet hardness (the level is the envelope's job). */
+  vel: number
+  /** Render length cap, seconds. */
+  maxDur: number
+  seed: number
+}
+
+/** The vibraphone's key-tracked ring (T60 of the fundamental, pedal down), seconds. */
+export function vibesT60(midi: number): number {
+  return Math.min(9, Math.max(2.5, 7 * Math.pow(2, -(midi - 53) / 18)))
+}
+
+/**
+ * Vibraphone bar struck by a yarn mallet. An undercut aluminium bar is tuned
+ * so its first three modes sit near 1 : 4 : 10; the resonator tube under it
+ * feeds the fundamental, which rings for seconds, while the 4th dies in a
+ * few tenths and the 10th is little more than the strike. A harder mallet
+ * (velocity) excites the upper modes more and lands faster; a soft felt
+ * thud (low-passed noise) sits under the onset. The motor tremolo is not in
+ * the render: it is one shared gain per layer (instruments.ts), so every
+ * note on the layer pulses together, as on the instrument.
+ */
+export function renderVibes(p: BarSpec): Float32Array {
+  const sr = p.sr
+  const midi = Math.min(100, Math.max(40, p.midi))
+  const f = 440 * Math.pow(2, (midi - 69) / 12)
+  const vel = Math.min(1, Math.max(0.05, p.vel))
+  const rng = createRng(p.seed)
+  const t60 = vibesT60(midi)
+  const len = Math.max(256, Math.round(Math.min(p.maxDur, t60) * sr))
+  const acc = new Float64Array(len)
+  // [ratio, level, T60 as a fraction of the fundamental's]
+  const modes: Array<[number, number, number]> = [
+    [1, 1, 1],
+    [3.99, 0.3 * (0.3 + vel), 0.16],
+    [9.86, 0.12 * vel * vel, 0.035],
+    // A faint torsional mode between them, off the harmonic grid: the metal in the tone.
+    [2.76, 0.035 * vel, 0.05],
+  ]
+  for (const [ratio, amp, frac] of modes) {
+    const fk = f * ratio
+    if (fk > sr * 0.42 || amp <= 0) continue
+    const tau = Math.max(0.012, (t60 * frac) / 6.9)
+    const w = (2 * Math.PI * fk) / sr
+    const r = Math.exp(-1 / (tau * sr))
+    const cr = r * Math.cos(w), ci = r * Math.sin(w)
+    const ph = ratio === 1 ? 0 : rng.next() * 2 * Math.PI
+    let re = amp * Math.cos(ph), im = amp * Math.sin(ph)
+    const stop = Math.min(len, Math.ceil(tau * sr * Math.log(Math.max(1, amp / 1e-4))))
+    for (let i = 0; i < stop; i++) {
+      acc[i] = acc[i]! + im
+      const t = re * cr - im * ci
+      im = re * ci + im * cr
+      re = t
+    }
+  }
+  // Mallet: the onset rises over 1 ms (hard) to 4 ms (soft); a felt thud under it.
+  const onset = Math.max(1, Math.round((0.004 - 0.003 * vel) * sr))
+  const tHz = 500 + 1800 * vel
+  const ta = Math.exp((-2 * Math.PI * tHz) / sr)
+  const tTau = 0.006
+  let n1 = 0, n2 = 0
+  const x = new Float32Array(len)
+  for (let i = 0; i < len; i++) {
+    let v = acc[i]!
+    if (i < sr * 0.05) {
+      const w = rng.next() * 2 - 1
+      n1 = (1 - ta) * w + ta * n1
+      n2 = (1 - ta) * n1 + ta * n2
+      v += n2 * (0.5 + 0.8 * vel) * Math.exp(-i / (tTau * sr))
+    }
+    if (i < onset) v *= 0.5 - 0.5 * Math.cos((Math.PI * i) / onset)
+    x[i] = v
+  }
+  dcBlock(x, sr, 15)
+  return finishNote(x, sr, 0.22, 0.95, 0.0005, Math.min(0.4, (len / sr) * 0.1))
 }

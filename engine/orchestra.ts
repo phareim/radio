@@ -68,6 +68,13 @@ export const KIN: Partial<Record<VoiceId, VoiceId[]>> = {
   // counter lines
   'counter.soft': ['counter.strings', 'keys.felt'],
   'counter.strings': ['counter.soft'],
+  // the Era voices: chip stays chip, acoustic stays acoustic (chip.pad and chip.bass have no chip kin: they keep their voice)
+  'chip.lead': ['lead.pulse', 'lead.square'],
+  'chip.bell': ['chip.lead', 'lead.pulse'],
+  'strings.ensemble': ['pad.choir'],
+  'wind.flute': ['lead.whistle', 'guitar.nylon', 'keys.felt', 'mallet.vibes'],
+  'mallet.vibes': ['mallet.marimba', 'keys.felt', 'guitar.nylon'],
+  'bass.upright': ['bass.finger'],
 }
 
 /** The instrument that doubles a lead an octave below. */
@@ -87,6 +94,10 @@ export const DOUBLE: Partial<Record<VoiceId, VoiceId>> = {
   'keys.felt': 'keys.piano',
   'guitar.nylon': 'keys.felt',
   'guitar.steel': 'guitar.nylon',
+  'chip.lead': 'lead.pulse',
+  'chip.bell': 'chip.lead',
+  'wind.flute': 'mallet.vibes',
+  'mallet.vibes': 'keys.felt',
 }
 
 /** The landscape's own voice on a layer (undefined when it has no such part). */
