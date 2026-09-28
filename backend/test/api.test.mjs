@@ -43,10 +43,11 @@ after(() => {
 
 const USER = 'listener@example.com'
 
-async function api(method, path, body, { key = KEY, headers = {}, user = USER } = {}) {
+/** USER is the owner (the Worker's allowlist) unless `owner: false`; everyone else is a guest. */
+async function api(method, path, body, { key = KEY, headers = {}, user = USER, owner = user === USER } = {}) {
   const res = await fetch(base + path, {
     method,
-    headers: { ...(key ? { authorization: `Bearer ${key}` } : {}), ...(user ? { 'x-radio-user': user } : {}), ...(body ? { 'content-type': 'application/json' } : {}), ...headers },
+    headers: { ...(key ? { authorization: `Bearer ${key}` } : {}), ...(user ? { 'x-radio-user': user } : {}), ...(owner ? { 'x-radio-owner': '1' } : {}), ...(body ? { 'content-type': 'application/json' } : {}), ...headers },
     body: body ? JSON.stringify(body) : undefined,
   });
   const text = await res.text();
@@ -189,10 +190,16 @@ test('jobs: only the owner sees a job, and never its input', async () => {
   assert.equal(job.input, undefined);
   assert.equal((await api('GET', `/jobs/${r.body.job.id}`, null, { user: 'other@example.com' })).status, 404);
   assert.equal((await api('GET', `/jobs/${r.body.job.id}`, null, { user: null })).status, 401);
-  // A review has no owner: any member may follow it.
+  // A review has no owner: only the owner (the Worker's allowlist) may follow it.
   const rv = Number(db.prepare(`INSERT INTO jobs (kind, status, input, created_at) VALUES ('review', 'done', '{}', ?)`)
     .run(new Date().toISOString()).lastInsertRowid);
-  assert.equal((await api('GET', `/jobs/${rv}`, null, { user: 'other@example.com' })).status, 200);
+  assert.equal((await api('GET', `/jobs/${rv}`, null, { user: 'other@example.com' })).status, 404);
+  assert.equal((await api('GET', `/jobs/${rv}`)).status, 200);
+  // So is a compose from before jobs had owners.
+  const old = Number(db.prepare(`INSERT INTO jobs (kind, status, input, created_at) VALUES ('compose', 'done', '{}', ?)`)
+    .run(new Date().toISOString()).lastInsertRowid);
+  assert.equal((await api('GET', `/jobs/${old}`, null, { user: `${'0'.repeat(32)}@guest` })).status, 404);
+  assert.equal((await api('GET', `/jobs/${old}`)).status, 200);
 });
 
 test('jobs: a restart runs what it left behind again, once', async () => {
@@ -301,3 +308,40 @@ test('compose: a finished landscape is handed to the painter with its owner', as
   const cols = db.prepare('PRAGMA table_info(landscapes)').all().map((c) => c.name);
   for (const c of ['paint_status', 'paint_error', 'painted_at']) assert.ok(cols.includes(c), c);
 });
+
+test('guests: daily limits per listener, per IP and in total; the owner has none', async () => {
+  const guest = (n, ip = `a${n}`.padEnd(16, '0')) => ({ user: `${String(n).padStart(32, '0')}@guest`, headers: { 'x-radio-ip': ip } })
+  const compose = (who) => api('POST', '/compose', { prompt: 'a quiet harbour' }, who)
+  const drain = async () => { for (let i = 0; i < 400 && jobs.pending; i++) await new Promise((r) => setTimeout(r, 25)) }
+  const since = db.prepare('SELECT COALESCE(MAX(id), 0) AS n FROM jobs').get().n
+  // Three a day per listener.
+  for (let i = 0; i < 3; i++) assert.equal((await compose(guest(1))).status, 202)
+  const fourth = await compose(guest(1))
+  assert.equal(fourth.status, 429)
+  assert.match(fourth.body.error, /3 new places a day/)
+  // A cleared cookie is a new listener on the same IP: still counted.
+  assert.equal((await compose(guest(2, guest(1).headers['x-radio-ip']))).status, 429)
+  // The guests' jobs carry the flag and the IP; the job never shows its input.
+  const row = db.prepare('SELECT input FROM jobs WHERE id > ? AND owner = ? LIMIT 1').get(since, guest(1).user)
+  assert.deepEqual([JSON.parse(row.input).guest, JSON.parse(row.input).ip], [1, guest(1).headers['x-radio-ip']])
+  await drain()
+  // In total: 15 a day across every guest (12 more, as if composed earlier today).
+  const ins = db.prepare(`INSERT INTO jobs (kind, status, input, owner, created_at) VALUES ('compose', 'done', ?, ?, ?)`)
+  for (let n = 10; n < 22; n++) ins.run(JSON.stringify({ guest: 1, ip: `b${n}` }), guest(n).user, new Date().toISOString())
+  const full = await compose(guest(99))
+  assert.equal(full.status, 429)
+  assert.match(full.body.error, /studio is full/)
+  // Yesterday's do not count.
+  db.prepare(`UPDATE jobs SET created_at = ? WHERE id > ? AND json_extract(input, '$.guest') = 1`).run(new Date(Date.now() - 25 * 3600_000).toISOString(), since)
+  assert.equal((await compose(guest(99))).status, 202)
+  // The owner is never limited.
+  assert.equal((await api('POST', '/compose', { prompt: 'still mine' })).status, 202)
+  await drain()
+  // Feedback from a guest shows as 'guest'; a review job stays hidden from them.
+  assert.equal((await api('POST', '/feedback', { rating: 1, comment: 'nice', snapshot: snapshot('coast') }, guest(1))).status, 201)
+  assert.equal((await api('GET', '/feedback?limit=1')).body.feedback[0].by, 'guest')
+  const review = await api('POST', '/review')
+  assert.equal((await api('GET', `/jobs/${review.body.job.id}`, null, guest(1))).status, 404)
+  assert.equal((await api('GET', `/jobs/${review.body.job.id}`)).status, 200)
+  await drain()
+})

@@ -1,7 +1,8 @@
 /**
  * Server-side client for radio-api on Sleeper (proxied at
  * https://sleeper.phareim.no/radio). The Bearer key is a Worker secret and
- * never reaches the browser; every route gates on requireAllowedUser first.
+ * never reaches the browser. Routes name the listener (listener.ts); the
+ * owner-only ones (reviews, everyone's feedback) gate on requireAllowedUser.
  */
 import { H3Event, createError, setResponseStatus } from 'h3'
 

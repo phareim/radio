@@ -3,7 +3,7 @@
     <div class="ch px-box" role="dialog" aria-label="Channels">
       <p class="ch__title">CHANNELS</p>
       <p class="ch__sub">
-        WHAT SHOWS ON THE DIAL · {{ allowed ? 'KEPT FOR ALL YOUR DEVICES' : 'KEPT IN THIS BROWSER' }}
+        WHAT SHOWS ON THE DIAL · {{ allowed && !guest ? 'KEPT FOR ALL YOUR DEVICES' : 'KEPT IN THIS BROWSER' }}
       </p>
 
       <ul class="ch__list">
@@ -53,7 +53,7 @@ const emit = defineEmits<{ close: []; compose: [] }>()
 
 const { landscapes, hud } = useRadio()
 const { isHidden, setShown } = useChannels()
-const { allowed } = useAuth()
+const { allowed, guest } = useAuth()
 const { hide } = usePlaces()
 const { say } = useFeedback()
 

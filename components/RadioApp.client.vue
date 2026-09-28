@@ -114,7 +114,7 @@ const radio = useRadio()
 const { controls, playing, set, landscapes, landscapeOf, hud } = radio
 const { rate, toast, say, flush } = useFeedback()
 const { compose, refresh, resume } = usePlaces()
-const { allowed, fetchSession, loginUrl } = useAuth()
+const { allowed, guest, fetchSession, loginUrl } = useAuth()
 const { auto, toggleAuto, glideOn } = useAuto()
 
 // ---- the quiet view: just the picture, and AUTO / ▶▶ / SHOW in a corner that fades when left alone
@@ -301,7 +301,7 @@ function onKey(e: KeyboardEvent): void {
   else if (allowed.value && (k === '-' || k === '_' || e.code === 'NumpadSubtract')) { if (!e.repeat) void rate(-1) }
   else if (allowed.value && (k === 'n' || k === 'N')) { if (!e.repeat) void rate(0) }
   // A way in for Petter on a new device; visitors never need it.
-  else if (!allowed.value && (k === 'l' || k === 'L')) window.location.href = loginUrl()
+  else if (guest.value && (k === 'l' || k === 'L')) window.location.href = loginUrl()
   else handled = false
   if (handled) e.preventDefault()
 }

@@ -1,9 +1,8 @@
-import { requireAllowedUser } from '~/server/utils/readerSession'
 import { radioFetch } from '~/server/utils/radioApi'
-import { asListener } from '~/server/utils/listener'
+import { asListener, listenerOf } from '~/server/utils/listener'
 
 export default defineEventHandler(async (event) => {
-  const user = await requireAllowedUser(event)
+  const listener = await listenerOf(event)
   const body = await readBody(event)
-  return radioFetch(event, '/feedback', { method: 'POST', body: JSON.stringify(body), headers: asListener(user.email.toLowerCase()) })
+  return radioFetch(event, '/feedback', { method: 'POST', body: JSON.stringify(body), headers: asListener(listener) })
 })
