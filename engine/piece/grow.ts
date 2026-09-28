@@ -7,7 +7,7 @@
 import type { DrumEvent, Groove, Landscape, Layer, NoteEvent, VoiceId } from '../types.ts'
 import { LAYERS } from '../types.ts'
 import { composeBar, makeMotif, newMemory, varyMotif } from '../composer.ts'
-import type { Motif } from '../composer.ts'
+import type { Motif, PhraseShape } from '../composer.ts'
 import { createRng, hashSeed } from '../rng.ts'
 import { scalePcs } from '../theory.ts'
 import type { Instrument, Level, Piece, PieceNote, Track } from './types.ts'
@@ -24,6 +24,10 @@ export interface GrowOptions {
   /** The track's ladder level; defaults to the level it is grown at. */
   enter?: Level
 }
+
+const SHAPE_WEIGHTS = { A: [2, 2, 1], A2: [1, 1, 2], B: [1, 1, 1] }
+/** Lead register per phrase kind, in semitones from the centre of its range. */
+const LIFT = { A: -2, A2: 3, B: -2 }
 
 /** A stable seed from a string (FNV-1a). */
 export function stringSeed(s: string): number {
@@ -101,6 +105,14 @@ function grow(piece: Piece, layer: Layer, level: Level, enter: Level, L: Landsca
     return contrast.get(c)!
   })
   const motifsB = motifs.map((m, p) => varyMotif(m, G, master.fork(20 + p), density))
+  // Each phrase's shape and register, as the radio picks them per section:
+  // the theme low and plain, its return higher and more developed, contrast
+  // phrases low. No 'call': a grown track plays alone, with no line to answer.
+  const phrasePlans = piece.chords.map((c, p) => {
+    const kind = c !== piece.chords[0] ? 'B' : p < 2 ? 'A' : 'A2'
+    const shape = master.fork(40 + p).weighted<PhraseShape>(['classic', 'period', 'sentence'], SHAPE_WEIGHTS[kind])
+    return { shape, lift: LIFT[kind] }
+  })
   const fills = piece.chords.map((_, p) => p === piece.phrases - 1 || p % 2 === 1 || master.fork(30 + p).chance(0.3))
   const drumsLayer = layer === 'drums'
 
@@ -111,10 +123,14 @@ function grow(piece: Piece, layer: Layer, level: Level, enter: Level, L: Landsca
     for (let b = 0; b < n; b++) {
       const p = Math.floor(b / PIECE_PHRASE_BARS)
       const pb = b % PIECE_PHRASE_BARS
+      const nextChord = spans[(b + 1) % n]![0]!.chord
+      // The bass walks into a new chord at the end of a phrase, as on the radio.
+      const walk = pb === PIECE_PHRASE_BARS - 1 && level >= 2 && nextChord.bass !== spans[b]![spans[b]!.length - 1]!.chord.bass
       const out = composeBar({
-        L: G, key, scale, spans: spans[b]!, next: spans[(b + 1) % n]![0]!.chord, level, density,
+        L: G, key, scale, spans: spans[b]!, next: nextChord, level, density,
         rng: createRng(hashSeed(seed, b + 1000)), phraseBar: pb, phraseBars: PIECE_PHRASE_BARS,
         motif: motifs[p]!, motifB: motifsB[p]!, leadOn: true,
+        shape: phrasePlans[p]!.shape, lift: phrasePlans[p]!.lift, walk,
         fill: drumsLayer && pb === PIECE_PHRASE_BARS - 1 && fills[p]!, pickup: false, crash: drumsLayer && b === 0,
         present: new Set<Layer>([layer]), mem, mood: 0.5,
       })

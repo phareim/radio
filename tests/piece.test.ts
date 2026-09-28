@@ -366,6 +366,19 @@ test('growing is deterministic and sounds like the landscape over the piece chor
   assert.equal(bass2.enter, 1)
 })
 
+test('a grown bass walks into a new chord at the end of a phrase, as on the radio', () => {
+  const p: Piece = { ...emptyPiece({ id: 'walk' }), phrases: 2, chords: ['1 6 4 5', '4 5 1 1'] }
+  const bass = growLayer(p, 'bass', 3, { lookup, seed: 5 })
+  const notes = (bar: string) => (parseNoteBar(bar) as { notes: Array<{ step: number; midi: number }> }).notes
+  // Bar 7 leads from 5 to 4: the last beat climbs the scale onto the next bass note.
+  const beat = notes(bass.bars[7]!).filter(n => n.step >= 12)
+  assert.ok(beat.length >= 2, 'the last beat walks')
+  const next = notes(bass.bars[8]!)[0]!.midi
+  assert.ok(beat.every((n, i) => n.midi < next && (i === 0 || n.midi > beat[i - 1]!.midi)), 'rising into the next chord')
+  // Bar 15 leads from 1 back to 1: no walk.
+  assert.ok(notes(bass.bars[15]!).filter(n => n.step >= 12).every(n => n.midi % 12 === chordAt(p, 15, 0).bass))
+})
+
 test('pieces from landscapes lay the progressions over two phrases', () => {
   assert.equal(phraseChords('1 6 3 7', 1, { tonic: 9, mode: 'aeolian' }, 1), '1 6 3 7 1 6 3 7')
   assert.equal(phraseChords('6 7 1:2', 1, { tonic: 9, mode: 'aeolian' }, 2), '6:1 7:1 1 6:1 7:1 1')

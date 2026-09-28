@@ -25,7 +25,11 @@ bar notation are documented in `engine/piece/types.ts`.
   plays the pattern the radio plays at the piece's intensity (or at the
   layer's entry level, when that is higher). Phrases on the opening chords
   state the theme (varied from the third phrase), other phrases a contrast
-  motif; drums fill at the loop end, after every second phrase, and now and
+  motif. Each phrase takes a shape the way the radio's sections do
+  (docs/engine.md, Variation): the theme low and mostly classic or period,
+  its return higher and more often a sentence, contrast phrases low with any
+  shape; never 'call', since a grown track has no line to answer it. From
+  level 2 the bass walks into a new chord at a phrase end. Drums fill at the loop end, after every second phrase, and now and
   then elsewhere, with a crash on bar 0.
 - A drum track's groove in a derived landscape is its most common bar, so a
   crash or fill bar is not taken for the groove; the fill is the first
