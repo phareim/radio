@@ -407,13 +407,17 @@ export function begin(res: Resources, at: number, dest: AudioNode, pan = 0): Not
   return { ac, res, at, srcs: [], amp, tail }
 }
 
-/** An oscillator started at the note's time. `detune` in cents; grit adds a little random spread. */
+/**
+ * An oscillator started at the note's time. `detune` in cents; grit adds a
+ * little random spread. It also runs the voices' LFOs, so rates go down to
+ * 0.01 Hz (safeHz's 10 Hz floor is for filters).
+ */
 export function osc(n: Note, type: Wave, f: number, detune = 0, at = n.at): OscillatorNode {
   const o = n.ac.createOscillator()
   if (type === 'pulse25') o.setPeriodicWave(n.res.pulse25)
   else if (type === 'pulse12') o.setPeriodicWave(n.res.pulse12)
   else o.type = type
-  o.frequency.value = safeHz(n.ac, f)
+  o.frequency.value = clamp(Number.isFinite(f) ? f : 440, 0.01, n.ac.sampleRate * 0.45)
   const spread = n.res.grit * (Math.random() * 2 - 1) * 5
   if (detune || spread) o.detune.value = detune + spread
   o.start(at)
@@ -421,10 +425,7 @@ export function osc(n: Note, type: Wave, f: number, detune = 0, at = n.at): Osci
   return o
 }
 
-/**
- * A sine LFO at `rate` Hz, started at `at`. Unlike osc() it keeps rates
- * under 10 Hz (safeHz clamps there), and has no grit spread.
- */
+/** A sine LFO at `rate` Hz (0.01–50), started at `at`, with no grit spread. */
 export function lfo(n: Note, rate: number, at = n.at): OscillatorNode {
   const o = n.ac.createOscillator()
   o.frequency.value = clamp(Number.isFinite(rate) ? rate : 5, 0.01, 50)
