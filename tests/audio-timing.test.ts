@@ -301,7 +301,7 @@ test('every instrument renders cleanly across its range', () => {
   const ranges: Record<InstrumentId, number[]> = {
     'keys.piano': [21, 48, 72, 96, 108], 'keys.felt': [21, 48, 72, 96, 108],
     'guitar.nylon': [40, 55, 70, 88], 'guitar.steel': [40, 55, 70, 88], 'guitar.mute': [40, 52, 64],
-    'bass.finger': [28, 33, 43, 55],
+    'bass.finger': [28, 33, 43, 55], 'bass.upright': [28, 33, 43, 55], 'mallet.vibes': [53, 65, 77, 89],
   }
   for (const id of Object.keys(INSTRUMENTS) as InstrumentId[]) {
     for (const midi of ranges[id]) {

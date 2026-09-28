@@ -1,36 +1,44 @@
 /**
  * The played instruments (jam's piano, guitar and bass; any layer may use
  * them): keys.piano, keys.felt, guitar.nylon, guitar.steel, guitar.mute,
- * bass.finger.
+ * bass.finger, and the acoustic end of the Era knob: bass.upright (plucked
+ * gut string) and mallet.vibes (vibraphone).
  *
  * Each note is a buffer rendered in JS (render.ts: Karplus-Strong strings,
- * additive pianos), cached per voice, pitch, velocity bucket and round-robin
- * variant in `res.bufs`, played through a gated VCA: the string or piano
- * rings on its own decay while the note is held, and the release (end of
- * `dur`, or NoteHandle.release) damps it like a finger or a damper. Two nodes
- * a note (three with a pan).
+ * additive pianos and vibraphone bars), cached per voice, pitch, velocity
+ * bucket and round-robin variant in `res.bufs`, played through a gated VCA:
+ * the string, piano or bar rings on its own decay while the note is held,
+ * and the release (end of `dur`, or NoteHandle.release) damps it like a
+ * finger, a damper or the vibraphone's damper bar. Two nodes a note (three
+ * with a pan). The vibraphone's notes play into one motor tremolo per layer
+ * (`v.cache`), so they pulse together.
  *
- * Velocity picks the bucket (brightness: pick attack, hammer hardness) and
- * scales the level; the level trims sit these voices at the loudness of their
- * neighbours (plucks and mallets, the other basses) in tests/audio-harness.
+ * Velocity picks the bucket (brightness: pick attack, hammer and mallet
+ * hardness) and scales the level; the level trims sit these voices at the
+ * loudness of their neighbours (plucks and mallets, the other basses) in
+ * tests/audio-harness.
  */
 import type { VoiceId, NoteEvent } from '../types.ts'
-import { type VoiceCtx, type NoteHandle, begin, envelope, finish, hz, clamp, velAmp } from './synth.ts'
-import { renderPluck, renderPiano, type PluckSpec } from './render.ts'
+import { type VoiceCtx, type NoteHandle, begin, envelope, finish, gain, hz, clamp, velAmp } from './synth.ts'
+import { renderPluck, renderPiano, renderVibes, type PluckSpec } from './render.ts'
 
 type Patch = (v: VoiceCtx, midi: number, at: number, dur: number, vel: number, opts: NoteEvent['opts'], pan: number) => NoteHandle
 
-export type InstrumentId = 'keys.piano' | 'keys.felt' | 'guitar.nylon' | 'guitar.steel' | 'guitar.mute' | 'bass.finger'
+export type InstrumentId =
+  | 'keys.piano' | 'keys.felt' | 'guitar.nylon' | 'guitar.steel' | 'guitar.mute' | 'bass.finger'
+  | 'bass.upright' | 'mallet.vibes'
 
 /** Loudness trims (linear), calibrated with tests/audio-harness like voices.ts LEVEL. */
 export const INSTRUMENT_LEVEL: Record<InstrumentId, number> = {
   'keys.piano': 0.314, 'keys.felt': 0.345,
   'guitar.nylon': 0.31, 'guitar.steel': 0.233, 'guitar.mute': 0.36, 'bass.finger': 0.24,
+  'bass.upright': 0.254, 'mallet.vibes': 0.356,
 }
 
 /** Round-robin variants per pitch, so repeated notes are not identical. */
 const VARIANTS: Record<InstrumentId, number> = {
   'keys.piano': 1, 'keys.felt': 1, 'guitar.nylon': 2, 'guitar.steel': 2, 'guitar.mute': 3, 'bass.finger': 2,
+  'bass.upright': 2, 'mallet.vibes': 1,
 }
 const turn = new Map<string, number>()
 
@@ -50,9 +58,9 @@ function bucket(vel: number, centres: readonly number[]): number {
  */
 function playRendered(
   v: VoiceCtx, id: InstrumentId, key: string, render: () => Float32Array,
-  at: number, dur: number, vel: number, pan: number, release: number,
+  at: number, dur: number, vel: number, pan: number, release: number, dest: AudioNode = v.out.input,
 ): NoteHandle {
-  const n = begin(v.res, at, v.out.input, pan)
+  const n = begin(v.res, at, dest, pan)
   const buf = v.res.bufs.get(key, render)
   const src = v.ac.createBufferSource()
   src.buffer = buf
@@ -87,7 +95,9 @@ interface StringVoice {
 
 const kt = (x: number, midi: number, ref: number, per: number) => x * Math.pow(2, -(midi - ref) / per)
 
-const STRINGS: Record<'guitar.nylon' | 'guitar.steel' | 'guitar.mute' | 'bass.finger', StringVoice> = {
+type StringId = 'guitar.nylon' | 'guitar.steel' | 'guitar.mute' | 'bass.finger' | 'bass.upright'
+
+const STRINGS: Record<StringId, StringVoice> = {
   // Round and soft: a flesh-and-nail pluck mid-string, the highs die quickly, a woody body.
   'guitar.nylon': {
     spec: (m, _f, vel) => {
@@ -136,6 +146,20 @@ const STRINGS: Record<'guitar.nylon' | 'guitar.steel' | 'guitar.mute' | 'bass.fi
     },
     release: m => clamp(kt(0.08, m, 40, 36), 0.05, 0.1),
   },
+  // Upright bass pizzicato: a gut string plucked with the side of the finger, dark and short, a big thump,
+  // the wooden body's low resonances (air and top plate) around 90-250 Hz and a dip where a bass guitar's
+  // pickup would bark.
+  'bass.upright': {
+    spec: (m, _f, vel) => {
+      const t60 = clamp(kt(1.9, m, 40, 24), 0.8, 2.4)
+      return {
+        t60, hiT60: 0.14, hiHz: 900,
+        exciteHz: 220 + 900 * vel * vel, pos: 0.3, maxDur: 2.6,
+        body: [[98, 1.3, 4], [165, 1.6, 3], [240, 1.8, 3.5], [650, 1, -3]], tone: 2000, thump: 0.75,
+      }
+    },
+    release: m => clamp(kt(0.07, m, 40, 36), 0.04, 0.09),
+  },
 }
 
 /** Render one note of an instrument (what the cache holds): for tests and offline listening. */
@@ -145,6 +169,10 @@ export function renderInstrument(id: InstrumentId, midi: number, vel: number, sr
     const b = bucket(vel, PIANO_BUCKETS)
     const felt = id === 'keys.felt'
     return renderPiano({ sr, midi: m, vel: PIANO_BUCKETS[b]!, felt, maxDur: felt ? 4 : 6, seed: m * 977 + b })
+  }
+  if (id === 'mallet.vibes') {
+    const b = bucket(vel, PLUCK_BUCKETS)
+    return renderVibes({ sr, midi: m, vel: PLUCK_BUCKETS[b]!, maxDur: 6, seed: m * 613 + b })
   }
   const b = bucket(vel, PLUCK_BUCKETS)
   const f = hz(m)
@@ -159,6 +187,37 @@ function stringPatch(id: keyof typeof STRINGS): Patch {
     const key = `${id}|${m}|${bucket(vel, PLUCK_BUCKETS)}|${k}`
     return playRendered(v, id, key, () => renderInstrument(id, m, vel, v.ac.sampleRate, k), at, dur, vel, pan, sv.release(m))
   }
+}
+
+// ---- vibraphone ---------------------------------------------------------------------------
+
+/**
+ * The vibraphone's motor: rotating discs in the resonators open and close
+ * them, a tremolo of about 5 Hz on everything the bars play. One per layer,
+ * built on first use; lives for the session.
+ */
+function motor(v: VoiceCtx): AudioNode {
+  const hit = v.cache.get('vibes.motor')
+  if (hit) return hit
+  const ac = v.ac
+  const trem = gain(ac, 0.74)
+  const lfo = ac.createOscillator()
+  lfo.frequency.value = 4.6 + Math.random() * 0.8
+  const depth = gain(ac, 0.26)
+  lfo.connect(depth)
+  depth.connect(trem.gain)
+  lfo.start(ac.currentTime)
+  trem.connect(v.out.input)
+  v.cache.set('vibes.motor', trem)
+  return trem
+}
+
+/** Vibraphone: the rendered bar through the layer's motor tremolo; the damper bar comes down at the end of `dur`. */
+const vibesPatch: Patch = (v, midi, at, dur, vel, _o, pan) => {
+  const id = 'mallet.vibes'
+  const m = Math.round(midi)
+  const key = `${id}|${m}|${bucket(vel, PLUCK_BUCKETS)}`
+  return playRendered(v, id, key, () => renderInstrument(id, m, vel, v.ac.sampleRate), at, dur, vel, pan, 0.3, motor(v))
 }
 
 // ---- pianos --------------------------------------------------------------------------------
@@ -181,6 +240,8 @@ export const INSTRUMENTS: Record<InstrumentId, Patch> = {
   'guitar.steel': stringPatch('guitar.steel'),
   'guitar.mute': stringPatch('guitar.mute'),
   'bass.finger': stringPatch('bass.finger'),
+  'bass.upright': stringPatch('bass.upright'),
+  'mallet.vibes': vibesPatch,
 }
 
 /** Every instrument id is a VoiceId (compile-time check). */

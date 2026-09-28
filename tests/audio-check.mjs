@@ -4,7 +4,7 @@
 //
 //   flock /tmp/claude-1000/chrome.lock node tests/audio-check.mjs [filter] [--wav] [--json]
 //
-// filter: substring of "group:name", e.g. "voice:pad", "landscape", "hits:kit.chip".
+// filter: substring of "group:name", e.g. "voice:pad", "landscape", "hits:kit.chip"; several comma-separated.
 // --smoke: also run the live player for ~16 s (worker clock, AudioContext, onBar, stop/start,
 //   and jam's transport: cut while playing, cut + setIdle, live notes while idle, an idle start).
 // --wav: also write WAVs of the full mix and every landscape to the out dir.

@@ -20,11 +20,23 @@ export interface Resources {
   brown: AudioBuffer
   /** 1.5 s of six detuned square waves (the TR-808 cymbal cluster). */
   metal: AudioBuffer
+  /** 1.5 s of the metal cluster under dense white noise: a real cymbal's spectrum with a little ring (kit.acoustic). */
+  cymbal: AudioBuffer
   /** NES noise channel, long mode (hiss) and short mode (metallic buzz), 1 s each. */
   nesLong: AudioBuffer
   nesShort: AudioBuffer
   pulse25: PeriodicWave
   pulse12: PeriodicWave
+  /** 50 % square with the same 48 harmonics as the pulses (the chip voices' square). */
+  pulse50: PeriodicWave
+  /** The NES triangle channel: a 4-bit staircase, 32 steps a cycle (band-limited, 48 harmonics). */
+  tri4: PeriodicWave
+  /** A 10-step triangle for vibrato LFOs at 6 Hz: one step per 60 Hz frame, like a sound driver's pitch table. */
+  vibStep: PeriodicWave
+  /** Flute tone: the fundamental with weaker 2nd and 3rd harmonics and a trace of the 4th and 5th. */
+  flute: PeriodicWave
+  /** Waves built on demand and kept for the context (chip.pad's arpeggio gates), by key. */
+  wave(key: string, build: () => PeriodicWave): PeriodicWave
   /** Current grit 0..1; voices add a little random detune with it. */
   grit: number
   /** Rendered note buffers (plucked strings, pianos), built on first use. */
@@ -78,6 +90,11 @@ export function createResources(ac: BaseAudioContext): Resources {
       d[i] = s / 6
     }
   })
+  const cymbal = mono(1.5, d => {
+    const m = metal.getChannelData(0)
+    for (let i = 0; i < d.length; i++) d[i] = 0.45 * m[i]! + 0.75 * (Math.random() * 2 - 1)
+    normalise(d, 0.9)
+  })
   const lfsr = (short: boolean, clock: number) => mono(1, d => {
     let reg = 1
     let acc = 0
@@ -103,10 +120,67 @@ export function createResources(ac: BaseAudioContext): Resources {
     for (let k = 1; k < n; k++) imag[k] = ((2 / (k * Math.PI)) * Math.sin(k * Math.PI * duty)) * (k > 24 ? 0.6 : 1)
     return ac.createPeriodicWave(real, imag)
   }
+  // The NES triangle: 15, 14, .. 0, 0, 1, .. 15, each step held for 1/32 of the cycle, centred.
+  const tri4 = waveFrom(ac, x => {
+    const k = Math.floor(x * 32)
+    return ((k < 16 ? 15 - k : k - 16) - 7.5) / 7.5
+  }, 48)
+  // Vibrato table: a triangle sampled at ten points (0, .4, .8, .8, .4, 0, -.4, ...), held.
+  const vibStep = waveFrom(ac, x => {
+    const k = Math.floor(x * 10)
+    return [0, 0.4, 0.8, 0.8, 0.4, 0, -0.4, -0.8, -0.8, -0.4][k] ?? 0
+  }, 40, { smooth: true })
+  const flute = harmonicWave(ac, [1, 0.3, 0.12, 0.045, 0.018])
+  const waves = new Map<string, PeriodicWave>()
   return {
-    ac, white, pink, brown, metal, nesLong, nesShort, pulse25: pulse(0.25), pulse12: pulse(0.125), grit: 0,
+    ac, white, pink, brown, metal, cymbal, nesLong, nesShort,
+    pulse25: pulse(0.25), pulse12: pulse(0.125), pulse50: pulse(0.5), tri4, vibStep, flute,
+    wave(key, build) {
+      let w = waves.get(key)
+      if (!w) { w = build(); waves.set(key, w) }
+      return w
+    },
+    grit: 0,
     bufs: createBufferCache(ac),
   }
+}
+
+/**
+ * A PeriodicWave from one cycle of a shape (`shape(phase)`, phase 0..1),
+ * by its first `harmonics` Fourier terms (the DC term is dropped). `smooth`
+ * applies Lanczos sigma factors: the steps get ramps of a few milliseconds
+ * instead of ringing. `raw` keeps the amplitudes as computed (no
+ * normalisation to a peak of 1), for gates and offsets.
+ */
+export function waveFrom(
+  ac: BaseAudioContext, shape: (phase: number) => number, harmonics: number, o: { smooth?: boolean; raw?: boolean } = {},
+): PeriodicWave {
+  const M = 2048
+  const x = new Float64Array(M)
+  for (let i = 0; i < M; i++) x[i] = shape((i + 0.5) / M)
+  const real = new Float32Array(harmonics + 1)
+  const imag = new Float32Array(harmonics + 1)
+  for (let k = 1; k <= harmonics; k++) {
+    let a = 0, b = 0
+    const w = (2 * Math.PI * k) / M
+    for (let i = 0; i < M; i++) {
+      a += x[i]! * Math.cos(w * (i + 0.5))
+      b += x[i]! * Math.sin(w * (i + 0.5))
+    }
+    const u = (Math.PI * k) / (harmonics + 1)
+    const sigma = o.smooth ? Math.sin(u) / u : 1
+    real[k] = (2 * a / M) * sigma
+    imag[k] = (2 * b / M) * sigma
+  }
+  return ac.createPeriodicWave(real, imag, { disableNormalization: !!o.raw })
+}
+
+/** A PeriodicWave of sine harmonics at the given levels (index 0 = the fundamental), all in sine phase. */
+export function harmonicWave(ac: BaseAudioContext, levels: readonly number[]): PeriodicWave {
+  const real = new Float32Array(levels.length + 1)
+  const imag = new Float32Array(levels.length + 1)
+  levels.forEach((l, i) => { imag[i + 1] = l })
+  return ac.createPeriodicWave(real, imag)
 }
 
 // ---- rendered note buffers ----------------------------------------------------
@@ -202,6 +276,20 @@ export const safeHz = (ac: BaseAudioContext, f: number): number => clamp(Number.
 // ---- the note builder --------------------------------------------------------
 
 export type Wave = OscillatorType | 'pulse25' | 'pulse12'
+
+/**
+ * An oscillator on a shared PeriodicWave, exactly in tune: no grit spread
+ * (the chip voices and the chip.pad gates want the pitch the chip would play).
+ * Low rates are allowed (LFOs and gates under 10 Hz).
+ */
+export function waveOsc(n: Note, wave: PeriodicWave, f: number, at = n.at): OscillatorNode {
+  const o = n.ac.createOscillator()
+  o.setPeriodicWave(wave)
+  o.frequency.value = clamp(Number.isFinite(f) ? f : 440, 0.01, n.ac.sampleRate * 0.45)
+  o.start(at)
+  n.srcs.push(o)
+  return o
+}
 
 export interface Note {
   ac: BaseAudioContext
@@ -328,6 +416,18 @@ export function osc(n: Note, type: Wave, f: number, detune = 0, at = n.at): Osci
   o.frequency.value = safeHz(n.ac, f)
   const spread = n.res.grit * (Math.random() * 2 - 1) * 5
   if (detune || spread) o.detune.value = detune + spread
+  o.start(at)
+  n.srcs.push(o)
+  return o
+}
+
+/**
+ * A sine LFO at `rate` Hz, started at `at`. Unlike osc() it keeps rates
+ * under 10 Hz (safeHz clamps there), and has no grit spread.
+ */
+export function lfo(n: Note, rate: number, at = n.at): OscillatorNode {
+  const o = n.ac.createOscillator()
+  o.frequency.value = clamp(Number.isFinite(rate) ? rate : 5, 0.01, 50)
   o.start(at)
   n.srcs.push(o)
   return o

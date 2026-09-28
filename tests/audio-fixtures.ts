@@ -57,8 +57,14 @@ function fake(bar: (i: number) => Bar): ConductorLike {
   return { nextBar: () => plan(i, bar(i++)), setControls: () => {}, controls }
 }
 
+/** The Era voices whose family name does not say how they are used. */
+const ROLE: Partial<Record<VoiceId, string>> = {
+  'chip.lead': 'lead', 'chip.bass': 'bass', 'chip.pad': 'pad', 'chip.bell': 'bell',
+  'strings.ensemble': 'pad', 'wind.flute': 'lead',
+}
+
 export function layerOf(v: VoiceId): Layer {
-  const fam = v.split('.')[0]
+  const fam = ROLE[v] ?? v.split('.')[0]
   return ({
     lead: 'lead', mallet: 'lead', pluck: 'lead', arp: 'arp', pad: 'pad', bass: 'bass', bell: 'bells', counter: 'counter', drone: 'drone',
     keys: 'lead', guitar: 'lead',
@@ -79,16 +85,21 @@ const MELODY_B: Array<[number, number, number, number]> = [
   [0, 2, 72, 0.9], [2, 2, 74, 0.7], [4, 6, 76, 0.85], [10, 2, 74, 0.6], [12, 2, 72, 0.7], [14, 2, 69, 0.6],
 ]
 
-/** Bars that play one voice the way its family is used. */
-export function soloVoice(voice: VoiceId, fx: Partial<FxState> = {}): ConductorLike {
-  const layer = layerOf(voice)
-  const fam = voice.split('.')[0]
+/**
+ * Bars that play one voice the way its family is used (`role` overrides the
+ * family: 'pad', 'counter', 'drone', 'bass', 'lead', ...). A chip.pad chord
+ * carries `opts.chord`, as the conductor sets it.
+ */
+export function soloVoice(voice: VoiceId, fx: Partial<FxState> = {}, role?: string): ConductorLike {
+  const fam = role ?? ROLE[voice] ?? voice.split('.')[0]
+  const layer = role ? (({ pad: 'pad', plain: 'pad', counter: 'counter', drone: 'drone', bass: 'bass', bell: 'bells' } as Record<string, Layer>)[role] ?? 'lead') : layerOf(voice)
   return fake(i => {
     const ch = CHORDS[Math.floor(i / 2) % 4]!
     const notes: NoteEvent[] = []
-    if (fam === 'pad') {
-      // Same chord two bars running (ties), then the next.
-      for (const m of ch.slice(1)) notes.push(n(layer, voice, m, 0, 16, 0.7))
+    if (fam === 'pad' || fam === 'plain') {
+      // Same chord two bars running (ties), then the next. 'plain': chip.pad without its chord opts.
+      const tones = ch.slice(1)
+      tones.forEach((m, k) => notes.push(n(layer, voice, m, 0, 16, 0.7, voice === 'chip.pad' && fam === 'pad' ? { opts: { chord: [k, tones.length] } } : {})))
     } else if (fam === 'drone') {
       notes.push(n(layer, voice, 38 + (Math.floor(i / 4) % 2) * 5, 0, 16, 0.8))
     } else if (fam === 'bass') {
@@ -121,8 +132,10 @@ export function playPart(voice: VoiceId): ConductorLike {
     const ch = CHORDS[Math.floor(i / 2) % 4]!
     const notes: NoteEvent[] = []
     const root = ch[0]! < 48 ? ch[0]! : ch[0]! - 12
-    if (voice.startsWith('keys.')) {
-      for (const s of [0, 8]) for (const m of [root, ...ch.slice(1, 4)]) notes.push(n(layer, voice, m, s, 7.5, s ? 0.5 : 0.62))
+    if (voice.startsWith('keys.') || voice === 'mallet.vibes') {
+      // Vibes: the same comping an octave up (the instrument starts at F3), the pedal down for half a bar.
+      const up = voice === 'mallet.vibes' ? 12 : 0
+      for (const s of [0, 8]) for (const m of [root, ...ch.slice(1, 4)]) notes.push(n(layer, voice, m + up, s, 7.5, s ? 0.5 : 0.62))
       for (const [s, len, m, vel] of i % 2 ? MELODY_B : MELODY) notes.push(n(layer, voice, m + 5, s, len, vel))
     } else if (voice === 'guitar.mute') {
       for (let s = 0; s < 16; s += 2) for (const m of [root + 12, root + 19]) notes.push(n(layer, voice, m, s, 1, s % 4 === 0 ? 0.9 : 0.65))

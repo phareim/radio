@@ -263,14 +263,19 @@ async function render(c: Case): Promise<Row> {
 
 function cases(filter: string, wavAll: boolean): Case[] {
   const out: Case[] = []
-  for (const v of VOICE_IDS) out.push({ group: 'voice', name: v, seconds: 14, conductor: () => soloVoice(v as VoiceId) })
+  // With --wav, every voice and kit case below writes its WAV too (filter to the ones you want to hear).
+  for (const v of VOICE_IDS) out.push({ group: 'voice', name: v, seconds: 14, conductor: () => soloVoice(v as VoiceId), wav: wavAll })
+  // The Era voices in their other roles: strings as a counter line and a drone, chip.pad without a chord, the triangle as a drone.
+  for (const [v, role] of ERA_ROLES) out.push({ group: 'voice', name: `${v}-${role}`, seconds: 14, conductor: () => soloVoice(v, {}, role), wav: wavAll })
+  // The arpeggio dry, where its slots can be measured.
+  out.push({ group: 'voice', name: 'chip.pad-dry', seconds: 14, conductor: () => soloVoice('chip.pad', { reverb: 0, delay: 0 }), wav: wavAll })
   for (const k of KIT_IDS) {
     const bar = 2.4
     out.push({
-      group: 'hits', name: k, seconds: 16.5, conductor: () => kitHits(k as KitId),
+      group: 'hits', name: k, seconds: 16.5, conductor: () => kitHits(k as KitId), wav: wavAll,
       windows: HIT_ORDER.map((h, i) => [h, 0.08 + (i * bar) / 2, 0.08 + ((i + 1) * bar) / 2 + (h === 'z' ? 0.2 : 0)]),
     })
-    out.push({ group: 'kit', name: k, seconds: 18, conductor: () => kitGroove(k as KitId) })
+    out.push({ group: 'kit', name: k, seconds: 18, conductor: () => kitGroove(k as KitId), wav: wavAll })
   }
   for (const a of AMBIENCE_IDS) out.push({ group: 'ambience', name: a, seconds: 20, conductor: () => soloAmbience(a as AmbienceId), from: 1 })
   out.push({ group: 'mix', name: 'fullmix', seconds: 24, conductor: fullMix, from: 2, wav: true, visual: true })
@@ -310,11 +315,17 @@ function cases(filter: string, wavAll: boolean): Case[] {
       return c
     },
   })
-  const pickd = filter ? out.filter(c => `${c.group}:${c.name}`.includes(filter)) : out.filter(c => c.group !== 'long')
+  // Several filters: comma-separated, any may match.
+  const alts = filter.split(',').filter(Boolean)
+  const pickd = alts.length ? out.filter(c => alts.some(f => `${c.group}:${c.name}`.includes(f))) : out.filter(c => c.group !== 'long')
   return pickd
 }
 
-const PLAYED: VoiceId[] = ['keys.piano', 'keys.felt', 'guitar.nylon', 'guitar.steel', 'guitar.mute', 'bass.finger']
+const PLAYED: VoiceId[] = ['keys.piano', 'keys.felt', 'guitar.nylon', 'guitar.steel', 'guitar.mute', 'bass.finger', 'bass.upright', 'mallet.vibes']
+
+const ERA_ROLES: Array<[VoiceId, string]> = [
+  ['strings.ensemble', 'counter'], ['strings.ensemble', 'drone'], ['chip.pad', 'plain'], ['chip.bass', 'drone'],
+]
 
 /**
  * Live notes: a chord on even ticks, released on the next tick (so each
