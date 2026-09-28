@@ -95,6 +95,7 @@ button {
 .px-btn--dim { --px-edge: #4a3d88; color: var(--muted); }
 .px-btn[disabled] { opacity: 0.45; cursor: default; }
 .px-btn[disabled]:hover { color: var(--px-edge); background: rgba(11, 6, 22, 0.88); }
+.px-btn--dim[disabled]:hover { color: var(--muted); }
 
 /* Touch screens keep :hover after a tap; only keyboard focus fills a button there. */
 @media (hover: none) {

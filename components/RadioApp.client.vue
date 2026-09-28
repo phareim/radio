@@ -47,15 +47,16 @@
           @click="toggle"
         >{{ playing ? '❚❚ PAUSE' : '▶ PLAY' }}</button>
         <template v-if="allowed">
-          <button type="button" class="px-btn deck__thumb" title="I LIKE THIS [+]" aria-label="Thumbs up" @click="rate(1)">▲</button>
-          <button type="button" class="px-btn px-btn--pink deck__thumb" title="NOT THIS [-]" aria-label="Thumbs down" @click="rate(-1)">▼</button>
-          <button type="button" class="px-btn px-btn--dim deck__note" title="A NOTE ON THIS MOMENT [N]" @click="rate(0)">NOTE</button>
+          <button type="button" class="px-btn deck__thumb" :disabled="!started" title="I LIKE THIS [+]" aria-label="Thumbs up" @click="rate(1)">▲</button>
+          <button type="button" class="px-btn px-btn--pink deck__thumb" :disabled="!started" title="NOT THIS [-]" aria-label="Thumbs down" @click="rate(-1)">▼</button>
+          <button type="button" class="px-btn px-btn--dim deck__note" :disabled="!started" title="A NOTE ON THIS MOMENT [N]" @click="rate(0)">NOTE</button>
         </template>
         <button
           type="button"
           class="px-btn px-btn--gold deck__hold"
           :class="{ on: controls.hold }"
           :aria-pressed="controls.hold"
+          :disabled="!started"
           title="KEEP THIS PROGRESSION AND MOTIF LOOPING [H]"
           @click="set({ hold: !controls.hold })"
         >HOLD</button>
@@ -110,7 +111,7 @@ import { coverURL } from '~/scene/cover.ts'
 import { load, save } from '~/composables/storage'
 
 const radio = useRadio()
-const { controls, playing, set, landscapes, landscapeOf, hud } = radio
+const { controls, playing, started, set, landscapes, landscapeOf, hud } = radio
 const { rate, toast, say, flush } = useFeedback()
 const { compose, refresh, resume } = usePlaces()
 const { allowed, guest, fetchSession, loginUrl } = useAuth()
@@ -163,12 +164,12 @@ function toggle(): void {
     return
   }
   if (pauseTimer) { clearTimeout(pauseTimer); pauseTimer = null }
-  const started = radio.play()
+  const starting = radio.play()
   // The player builds its context and stream synchronously, so the element
   // starts inside this same gesture.
   routeToElement()
   setSessionState()
-  started.catch(() => say('AUDIO WOULD NOT START', 'warn'))
+  starting.catch(() => say('AUDIO WOULD NOT START', 'warn'))
 }
 
 /**
@@ -291,14 +292,14 @@ function onKey(e: KeyboardEvent): void {
   else if (k === 'ArrowRight') stepPlace(1)
   else if (k === 'ArrowUp') set({ intensity: Math.min(4, controls.intensity + 1) as Controls['intensity'] })
   else if (k === 'ArrowDown') set({ intensity: Math.max(0, controls.intensity - 1) as Controls['intensity'] })
-  else if (k === 'h' || k === 'H') set({ hold: !controls.hold })
+  else if (started.value && (k === 'h' || k === 'H')) set({ hold: !controls.hold })
   else if (k === 'a' || k === 'A') { if (!e.repeat) toggleAuto() }
   else if (k === 'g' || k === 'G') { if (!e.repeat) glideOn() }
   else if (k === 'd' || k === 'D') { if (!e.repeat) setCalm(!calm.value) }
   else if (k === 'c' || k === 'C') { if (!e.repeat) channelsOpen.value = true }
-  else if (allowed.value && (k === '+' || k === '=' || e.code === 'NumpadAdd')) { if (!e.repeat) void rate(1) }
-  else if (allowed.value && (k === '-' || k === '_' || e.code === 'NumpadSubtract')) { if (!e.repeat) void rate(-1) }
-  else if (allowed.value && (k === 'n' || k === 'N')) { if (!e.repeat) void rate(0) }
+  else if (allowed.value && started.value && (k === '+' || k === '=' || e.code === 'NumpadAdd')) { if (!e.repeat) void rate(1) }
+  else if (allowed.value && started.value && (k === '-' || k === '_' || e.code === 'NumpadSubtract')) { if (!e.repeat) void rate(-1) }
+  else if (allowed.value && started.value && (k === 'n' || k === 'N')) { if (!e.repeat) void rate(0) }
   // A way in for Petter on a new device; visitors never need it.
   else if (guest.value && (k === 'l' || k === 'L')) window.location.href = loginUrl()
   else handled = false
@@ -379,6 +380,12 @@ onBeforeUnmount(() => {
 .deck__dial { grid-area: dial; }
 .deck__knobs { grid-area: knobs; display: flex; flex-direction: column; gap: 8px; justify-content: center; }
 
+/* The knobs' faint neon: each button glows a little in its own edge colour. */
+:where(.deck__transport) .px-btn:not([disabled]) {
+  box-shadow:
+    0 -2px 0 0 var(--px-edge), 0 2px 0 0 var(--px-edge), -2px 0 0 0 var(--px-edge), 2px 0 0 0 var(--px-edge),
+    0 0 8px color-mix(in srgb, var(--px-edge) 45%, transparent);
+}
 .deck__play { min-width: 128px; height: 36px; padding: 0 14px; }
 .deck__play.on, .deck__play.on:hover { color: var(--bg); background: var(--pink); box-shadow: 0 -2px 0 0 var(--pink), 0 2px 0 0 var(--pink), -2px 0 0 0 var(--pink), 2px 0 0 0 var(--pink), 0 0 14px color-mix(in srgb, var(--pink) 55%, transparent); }
 .deck__thumb { width: 40px; height: 36px; padding: 0; }
