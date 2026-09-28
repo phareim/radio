@@ -14,6 +14,7 @@ Opus does; Opus can also compose new landscapes.
 | Pixel scenes, one per landscape | `scene/` | `docs/landscapes.md` |
 | Pieces for jam (format, notation, piece conductor, landscape derivation, growing, pattern library) | `engine/piece/` | `docs/piece.md` |
 | Web app (Nuxt 3 Worker, Reader login, proxies to the backend) | repo root | `README.md` |
+| Town chip: `⌂ TOWN` and Escape back to phareim.no, shown only when the visit came from it (`?from=phareim` or a phareim.no referrer; 2026-09-28) | `components/TownChip.client.vue` | header comment |
 | Backend `radio-api` on Sleeper (feedback, compose, review, painting scenes for composed channels) | `backend/` | `backend/README.md` |
 
 ## Rules

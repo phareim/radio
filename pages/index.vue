@@ -1,6 +1,7 @@
 <template>
   <ClientOnly>
     <RadioApp />
+    <TownChip />
     <template #fallback>
       <div class="shell">
         <p class="shell__title">RADIO</p>
