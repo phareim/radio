@@ -36,14 +36,14 @@ All JSON. Everything except `GET /health` needs `Authorization: Bearer $RADIO_AP
 | GET | `/health` | | `{ok, service, uptime_s, jobsPending, unreviewed}` |
 | POST | `/feedback` | `{rating: 1\|-1\|0, comment, snapshot: FeedbackSnapshot}` (rating 0 needs a comment) | 201 `{id}` |
 | PATCH | `/feedback/:id` | `{comment}` | `{feedback}`; only the member who gave it (404 otherwise) |
-| GET | `/feedback` | `?limit=` (default 50, max 500) `&landscape=` | `{feedback: [...]}`, newest first |
+| GET | `/feedback` | `?limit=` (default 50, max 500) `&landscape=` | `{feedback: [...]}`, newest first, each with `by` |
 | GET | `/feedback/stats` | | `{stats: [{landscape, up, down, comments, total, unreviewed}]}` |
 | GET | `/landscapes` | | `{landscapes: Landscape[]}`: Opus-composed, not hidden, oldest first, each with `origin: 'opus'` and `prompt` |
 | DELETE | `/landscapes/:id` | | `{id, hidden: true}` (kept in the DB, just hidden) |
 | POST | `/compose` | `{prompt, base?: built-in id}` | 202 `{job}` |
 | POST | `/review` | | 202 `{job}` |
 | GET | `/reviews` | | `{reviews: [{id, at, feedbackFrom, feedbackTo, path, summary}]}` |
-| GET | `/jobs/:id` | | `{job: {id, kind, status, result, error, createdAt, finishedAt}}`; only the member who started it (404 otherwise), review jobs to any member |
+| GET | `/jobs/:id` | | `{job: {id, kind, status, result, error, createdAt, finishedAt}}`; only the member who started it (404 otherwise), review jobs to the owner only |
 | GET | `/jam/pieces` | | `{pieces: [{id, name, updatedAt, channel?}]}`, last saved first |
 | GET | `/jam/pieces/:id` | | `{piece, updatedAt}` |
 | PUT | `/jam/pieces/:id` | Piece (`engine/piece/types.ts`) | `{piece, updatedAt}`: the validated copy |
@@ -64,6 +64,26 @@ queued or running again and runs them from the start; a job already started twic
 `error: interrupted by a restart` instead.
 
 CORS allows `RADIO_CORS_ORIGINS` and any `http://localhost:*`.
+
+## Listeners and limits
+
+The radio is open to anyone with the link. The Worker names every listener
+in `X-Radio-User` (an email, or `<32 hex>@guest` for a browser without a
+Reader session), sends a salted hash of the IP in `X-Radio-Ip`, and
+`X-Radio-Owner: 1` for its allowlist (Petter). The owner has no limits and
+is the only one who may follow a review job. Everyone else gets, per rolling
+24 hours (`guestLimits()` in `lib/app.mjs`, 429 past them):
+
+| Env | Default | Counts |
+|---|---|---|
+| `RADIO_GUEST_COMPOSE_PER_DAY` | 3 | composes per listener, and per IP hash |
+| `RADIO_GUEST_COMPOSE_TOTAL_PER_DAY` | 15 | composes by all non-owners together |
+| `RADIO_GUEST_FEEDBACK_PER_DAY` | 100 | feedback per listener or IP hash |
+
+A non-owner's compose job carries `guest: 1` and `ip` in its input (never
+handed back). Feedback keeps the IP hash in `feedback.ip`; `GET /feedback`
+shows `by`: the member's email, or `guest`. Paintings stay the owner's
+(`RADIO_PAINT_OWNERS`), so a guest's channel keeps its borrowed scene.
 
 ## Compose
 

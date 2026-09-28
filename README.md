@@ -11,9 +11,14 @@ works, with editable code cells running it in the page (Norwegian):
 ## The web app
 
 Nuxt 3 on a Cloudflare Worker (`radio-web`, custom domain `radio.phareim.no`),
-public: anyone can listen. A Reader session on the email allowlist (tier 3
-in the `phareim-webapps` skill) unlocks thumbs, notes and composing, and
-every API route except the public list of composed places is gated. The Worker renders a shell; everything else runs client-side in
+open to anyone with the link, no login needed: listening, thumbs, notes,
+composing and settings. A listener without a Reader session is a guest,
+named by a random id in the `radio_guest` cookie (so their channels and
+settings follow that browser); a Reader session names them by email (every
+device). The email allowlist (Petter, tier 3 in the `phareim-webapps` skill)
+is the owner: no daily limits, and only the owner reaches the reviews and
+everyone's feedback (`/api/review`, `/api/reviews`, `GET /api/feedback`,
+`/api/feedback/stats`). The Worker renders a shell; everything else runs client-side in
 `components/RadioApp.client.vue`.
 
 ```
@@ -35,7 +40,7 @@ composables/
   usePlaces.ts             your composed places: load, compose job, remove
   useChannels.ts           which channels show: this browser, or a member's settings on radio-api
   useAuto.ts               AUTO: slow drift from place to place
-server/api/                proxies to radio-api, each gated by requireAllowedUser
+server/api/                proxies to radio-api; listener.ts names the listener, the owner's routes use requireAllowedUser
 server/utils/              readerSession.ts + cloudflare.ts (vendored Reader auth), radioApi.ts
 scripts/make-icons.py      favicon, apple-touch and manifest icons (Pillow)
 ```
@@ -45,13 +50,16 @@ scripts/make-icons.py      favicon, apple-touch and manifest icons (Pillow)
   `conductor.setControls` with only the changed fields. Controls persist in
   localStorage. There is no volume knob; the device's own volume rules.
 - Keys: Space play/pause, 1–9 and 0 places, ← → previous/next place, ↑ ↓
-  intensity, H hold, A auto, G glide on, D dim; signed in: + / −
-  thumbs, N note; signed out: L goes to Reader's login. Ignored while typing.
+  intensity, H hold, A auto, G glide on, D dim, + / − thumbs, N note; as a
+  guest L goes to Reader's login. Ignored while typing.
 - Channels: composed places are private to whoever composed them (radio-api
-  keeps an owner per landscape; the Worker passes the member's email as
-  `X-Radio-User`). Which channels show is kept per browser, or for members
-  in radio-api's `settings` table, so it follows them to every device.
-  When a fresh session answer names another member (or nobody),
+  keeps an owner per landscape; the Worker passes the listener as
+  `X-Radio-User`: an email, or `<guest id>@guest`, plus `X-Radio-Ip`, a
+  salted hash of the IP, and `X-Radio-Owner: 1` for the allowlist). Which
+  channels show is kept in radio-api's `settings` table under that id.
+  Guests get daily limits (radio-api answers 429; `backend/README.md`), and
+  their channels borrow a built-in scene: only the owner's are painted.
+  When a fresh session answer names another listener,
   `useAuth` drops the last member's copies in this browser: composed
   channels, the compose job, hidden channels, the service worker's API
   cache, and their unsent notes if someone else signed in. Offline, the

@@ -103,6 +103,8 @@ export function openDb(file) {
 function migrate(db) {
   const cols = (t) => db.prepare(`PRAGMA table_info(${t})`).all().map((c) => c.name);
   const legacy = process.env.RADIO_LEGACY_OWNER || 'phareim@gmail.com';
+  // Who gave feedback from where (the Worker's hash of the IP), for the guests' daily limit; 2026-09-28.
+  if (!cols('feedback').includes('ip')) db.exec('ALTER TABLE feedback ADD COLUMN ip TEXT');
   if (!cols('landscapes').includes('owner')) {
     db.exec('ALTER TABLE landscapes ADD COLUMN owner TEXT');
     db.prepare('UPDATE landscapes SET owner = ? WHERE owner IS NULL').run(legacy);
@@ -167,6 +169,8 @@ export function feedbackRow(r) {
     landscape: r.landscape,
     snapshot: parse(r.snapshot),
     reviewedAt: r.reviewed_at ?? null,
+    // Who gave it: a member's email, or 'guest' for a listener without a login.
+    by: r.user?.endsWith('@guest') ? 'guest' : (r.user ?? null),
   };
 }
 

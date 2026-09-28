@@ -58,7 +58,7 @@ function corsHeaders(req, origins) {
   return {
     'access-control-allow-origin': origin,
     'access-control-allow-methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
-    'access-control-allow-headers': 'authorization, content-type, x-radio-user',
+    'access-control-allow-headers': 'authorization, content-type, x-radio-user, x-radio-ip, x-radio-owner',
     'access-control-max-age': '600',
     vary: 'Origin',
   };
@@ -76,6 +76,33 @@ function listener(req) {
   return /^[^\s@]{1,100}@[^\s@]{1,100}$/.test(u) ? u : null;
 }
 
+/** The listener's IP as the Worker hashed it (for the guests' daily limits), else null. */
+function listenerIp(req) {
+  const ip = String(req.headers['x-radio-ip'] ?? '').trim().toLowerCase();
+  return /^[a-f0-9]{8,64}$/.test(ip) ? ip : null;
+}
+
+/** Petter (the Worker's allowlist): no limits, and the reviews are his. */
+const isOwner = (req) => req.headers['x-radio-owner'] === '1';
+
+/**
+ * What a listener who is not the owner may use in a day (rolling 24 h). The
+ * radio is open to anyone with the link, signed in or not, so the limits
+ * count per listener, per (hashed) IP, and for all of them together: a
+ * cleared cookie makes a new listener but not a new IP, and the total caps
+ * what the Opus subscription spends on guests.
+ */
+export function guestLimits(env = process.env) {
+  const n = (k, d) => { const v = Number(env[k]); return Number.isFinite(v) && v >= 0 ? v : d; };
+  return {
+    compose: n('RADIO_GUEST_COMPOSE_PER_DAY', 3),
+    composeAll: n('RADIO_GUEST_COMPOSE_TOTAL_PER_DAY', 15),
+    feedback: n('RADIO_GUEST_FEEDBACK_PER_DAY', 100),
+  };
+}
+
+const dayAgo = () => new Date(Date.now() - 24 * 3600_000).toISOString();
+
 function needListener(req) {
   const u = listener(req);
   if (!u) throw new HttpError(401, 'X-Radio-User is required');
@@ -88,7 +115,7 @@ function cleanSettings(b) {
   return { hidden: [...new Set(hidden)].slice(0, 200) };
 }
 
-export function createApp({ db, apiKey, corsOrigins = [], ask, paint = startPaint }) {
+export function createApp({ db, apiKey, corsOrigins = [], ask, paint = startPaint, limits = guestLimits() }) {
   const jobs = createJobs(db, {
     compose: async (input) => {
       const res = await composeLandscape({ db, prompt: input.prompt, base: input.base, owner: input.owner ?? null, ask });
@@ -117,8 +144,16 @@ export function createApp({ db, apiKey, corsOrigins = [], ask, paint = startPain
       if (!landscape) throw new HttpError(400, 'snapshot.landscape is required');
       const comment = str(b.comment, 4000);
       if (b.rating === 0 && !comment.trim()) throw new HttpError(400, 'a comment-only entry needs a comment');
-      const r = db.prepare('INSERT INTO feedback (at, rating, comment, snapshot, landscape, user) VALUES (?, ?, ?, ?, ?, ?)')
-        .run(now(), b.rating, comment, JSON.stringify(b.snapshot), landscape, listener(req));
+      const snapshot = JSON.stringify(b.snapshot);
+      if (snapshot.length > 32_000) throw new HttpError(400, 'snapshot is too large');
+      const ip = listenerIp(req);
+      if (!isOwner(req)) {
+        const since = dayAgo();
+        const mine = db.prepare('SELECT COUNT(*) AS n FROM feedback WHERE at > ? AND (user = ? OR ip = ?)').get(since, listener(req) ?? '', ip ?? '').n;
+        if (mine >= limits.feedback) throw new HttpError(429, 'that is a lot of feedback for one day; thank you, try again tomorrow');
+      }
+      const r = db.prepare('INSERT INTO feedback (at, rating, comment, snapshot, landscape, user, ip) VALUES (?, ?, ?, ?, ?, ?, ?)')
+        .run(now(), b.rating, comment, snapshot, landscape, listener(req), ip);
       return [201, { id: Number(r.lastInsertRowid) }];
     }],
 
@@ -195,7 +230,17 @@ export function createApp({ db, apiKey, corsOrigins = [], ask, paint = startPain
         }
         base = b.base;
       }
-      return [202, { job: jobs.enqueue('compose', { prompt, base, owner }) }];
+      if (isOwner(req)) return [202, { job: jobs.enqueue('compose', { prompt, base, owner }) }];
+      const ip = listenerIp(req);
+      const since = dayAgo();
+      const count = (where, ...args) => db.prepare(`SELECT COUNT(*) AS n FROM jobs WHERE kind = 'compose' AND created_at > ? AND ${where}`).get(since, ...args).n;
+      if (count('owner = ?', owner) >= limits.compose || (ip && count(`json_extract(input, '$.ip') = ?`, ip) >= limits.compose)) {
+        throw new HttpError(429, `${limits.compose} new places a day; come back tomorrow`);
+      }
+      if (count(`json_extract(input, '$.guest') = 1`) >= limits.composeAll) {
+        throw new HttpError(429, 'the studio is full for today; come back tomorrow');
+      }
+      return [202, { job: jobs.enqueue('compose', { prompt, base, owner, guest: 1, ip }) }];
     }],
 
     ['POST', /^\/review$/, async () => [202, { job: jobs.enqueue('review', {}) }]],
@@ -211,10 +256,10 @@ export function createApp({ db, apiKey, corsOrigins = [], ask, paint = startPain
 
     ...jamRoutes({ db, jobs, HttpError, readJson, needListener }),
 
-    // A job is its owner's; review jobs have none and any member may follow them.
+    // A job is its owner's; review jobs have none and only the owner may follow them.
     ['GET', /^\/jobs\/(\d+)$/, async (req, [, id]) => {
       const job = jobs.get(Number(id), needListener(req));
-      if (!job) throw new HttpError(404, 'no such job');
+      if (!job || (job.kind === 'review' && !isOwner(req))) throw new HttpError(404, 'no such job');
       return { job };
     }],
   ];

@@ -1,8 +1,10 @@
 /**
  * Read-only auth state. Reader (reader.phareim.no) is the identity provider
- * and its session cookie covers *.phareim.no. The radio itself is public;
- * `allowed` unlocks thumbs, notes and composing. On localhost (dev) every
- * listener counts as allowed.
+ * and its session cookie covers *.phareim.no. The radio is open to anyone
+ * with the link: `allowed` (always true once the session answers) unlocks
+ * thumbs, notes and composing. `guest` means no Reader session: what they keep
+ * follows this browser (the Worker's `radio_guest` cookie). On localhost (dev)
+ * every listener counts as allowed.
  */
 import { load, save } from './storage'
 import { useChannels } from './useChannels'
@@ -38,6 +40,7 @@ interface SessionUser {
 export function useAuth() {
   const user = useState<SessionUser | null>('auth_user', () => null)
   const allowed = useState<boolean>('auth_allowed', () => false)
+  const guest = useState<boolean>('auth_guest', () => true)
   const checked = useState<boolean>('auth_checked', () => false)
 
   async function fetchSession(): Promise<boolean> {
@@ -47,12 +50,13 @@ export function useAuth() {
       return true
     }
     try {
-      const data = await $fetch<{ user: SessionUser | null; allowed: boolean }>('/api/auth/session')
+      const data = await $fetch<{ user: SessionUser | null; allowed: boolean; guest?: boolean; member?: string }>('/api/auth/session')
       user.value = data.user
       allowed.value = !!data.allowed
+      guest.value = data.guest !== false
       // A cached answer (offline) repeats the member it was cached for; that is
-      // left as is.
-      await forgetOtherMember(allowed.value && data.user ? data.user.email.toLowerCase() : null)
+      // left as is. A guest is a member too, named by this browser's id.
+      await forgetOtherMember(allowed.value ? (data.member ?? data.user?.email.toLowerCase() ?? null) : null)
     } catch {
       user.value = null
       allowed.value = false
@@ -66,5 +70,5 @@ export function useAuth() {
     return `${READER_LOGIN}?redirect=${encodeURIComponent(here)}`
   }
 
-  return { user, allowed, checked, fetchSession, loginUrl }
+  return { user, allowed, guest, checked, fetchSession, loginUrl }
 }

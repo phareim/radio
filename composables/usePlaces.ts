@@ -64,9 +64,20 @@ async function start(prompt: string, base?: string): Promise<void> {
     compose.value = { phase: 'working', jobId: r.job.id, prompt: text, status: r.job.status, since: Date.now() }
     save(JOB_KEY, { id: r.job.id, prompt: text, since: Date.now() })
     poll()
-  } catch {
-    compose.value = { phase: 'error', message: 'COULD NOT REACH THE STUDIO' }
+  } catch (e) {
+    compose.value = { phase: 'error', message: refusal(e) ?? 'COULD NOT REACH THE STUDIO' }
   }
+}
+
+/** The backend's words when it says no for today (429: a guest's daily limit), else null. */
+function refusal(e: unknown): string | null {
+  const err = e as { statusCode?: number; data?: { data?: unknown } }
+  if (err?.statusCode !== 429) return null
+  try {
+    const words = JSON.parse(String(err.data?.data ?? '')).error
+    if (typeof words === 'string' && words) return words.toUpperCase()
+  } catch { /* not JSON */ }
+  return 'THAT IS ALL FOR TODAY; COME BACK TOMORROW'
 }
 
 function poll(): void {
