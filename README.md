@@ -29,7 +29,7 @@ components/
   StationDial.vue          the channels shown (1–0), then CHANNELS
   ChannelsDialog.vue       show/hide each channel, remove your own, + NEW PLACE
   IntensityBar.vue         STILL … SURGE
-  PxSlider.vue             segmented knobs (mood, space, era, density, tempo)
+  PxSlider.vue             segmented knobs (mood, era, density, tempo)
   LayerStrip.vue           the ten layers lit by level, entries counting down
   CommentBox.vue           words after ▲ / ▼ / NOTE
   ComposeDialog.vue        ask Opus for a place, wait for the job
@@ -49,6 +49,8 @@ scripts/make-icons.py      favicon, apple-touch and manifest icons (Pillow)
   so far; every change goes through `useRadio().set()`, which calls
   `conductor.setControls` with only the changed fields. Controls persist in
   localStorage. There is no volume knob; the device's own volume rules.
+  Era also sets the engine's `space` (`space = era`): dry at 8-bit, vast at
+  analog.
 - Keys: Space play/pause, 1–9 and 0 places, ← → previous/next place, ↑ ↓
   intensity, H hold, A auto, G glide on, D dim, + / − thumbs, N note; as a
   guest L goes to Reader's login. Ignored while typing.

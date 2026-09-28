@@ -27,9 +27,14 @@
   :root { --app-height: 100vh; }
 }
 
+/* On a phone the lowest knob keeps clear of the home indicator's swipe zone. */
+@media (pointer: coarse) {
+  :root { --app-safe-bottom: calc(env(safe-area-inset-bottom, 0px) + 16px); }
+}
+
 /* Installed as a web app the page reaches the home indicator. */
 @media (display-mode: standalone), (display-mode: fullscreen) {
-  :root { --app-safe-bottom: max(24px, calc(env(safe-area-inset-bottom, 0px) + 12px)); }
+  :root { --app-safe-bottom: max(40px, calc(env(safe-area-inset-bottom, 0px) + 24px)); }
 }
 
 /* iOS home-screen app with a black-translucent status bar: 100dvh comes up a status bar short. */

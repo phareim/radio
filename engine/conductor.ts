@@ -126,11 +126,15 @@ export function modeFor(L: Landscape, mood: number): Mode {
   return L.moods[Math.round(eff * (L.moods.length - 1))]!
 }
 
+/** Crush at the 8-bit end: enough staircase to be a console, short of crackle. */
+export const ERA_CRUSH = 0.75
+
 /**
  * A landscape's effects shaped by the Space, Era and Mood knobs. The pump
  * only works while drums sound. Era's middle keeps the landscape's tape;
  * toward 8-bit the tape goes and bit crush comes in (gently over the first
- * stretch), toward analog the tape deepens.
+ * stretch, and never all the way to the coarse staircase), toward analog the
+ * tape deepens a little.
  */
 export function shapeFx(f: FxSpec, controls: Pick<Controls, 'space' | 'era' | 'mood'>, drums: boolean): FxState {
   const space = controls.space
@@ -141,8 +145,8 @@ export function shapeFx(f: FxSpec, controls: Pick<Controls, 'space' | 'era' | 'm
     delay: Math.min(1, f.delay * (0.35 + 1.3 * space)),
     reverbSize: f.reverbSize * (0.65 + 0.7 * space),
     tone: Math.max(0.05, Math.min(1, f.tone * (1.08 - 0.16 * controls.mood))),
-    grit: Math.min(1, (f.grit * 0.4 + 0.225) * (1 - chip) + 0.5 * analog),
-    crush: chip * chip,
+    grit: Math.min(1, (f.grit * 0.4 + 0.225) * (1 - chip) + 0.35 * analog),
+    crush: ERA_CRUSH * chip * chip,
     pump: (f.pump ?? 0) * (drums ? 1 : 0),
     width: 0.55 + 0.45 * space,
   }

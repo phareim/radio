@@ -42,7 +42,7 @@ where a musician would put them:
 | mood | the mode changes when the next progression starts |
 | density | next phrase |
 | era | voices and kits at the next phrase start (layer by layer, see Era); crush and tape glide over about a bar |
-| space | glides over about a bar |
+| space | glides over about a bar. The radio has no Space knob: Era sets it too (`space = era`), dry at 8-bit, vast at analog; jam keeps its own |
 | tempo | glides across the next phrase (eased at both ends) |
 | hold | freezes progression and motif; the section loops until released |
 
@@ -120,8 +120,9 @@ instruments, not samples.
 - **Effects** (`shapeFx`): with `c = max(0, 0.5 − era)·2` and
   `a = max(0, era − 0.5)·2`, tape (`fx.grit`) is the landscape's own at the
   middle (`FxSpec.grit·0.4 + 0.225`), falls to 0 toward 8-bit and rises by up
-  to 0.5 toward analog; `fx.crush = c²`, so the first stretch toward 8-bit
-  is subtle. They glide like the other fx.
+  to 0.35 toward analog; `fx.crush = 0.75·c²` (`ERA_CRUSH`), so the first
+  stretch toward 8-bit is subtle and the far end stops short of the coarse
+  staircase's crackle. They glide like the other fx.
 - jam's piece conductor uses Era only for the effects: a piece's
   instruments are hand-picked.
 

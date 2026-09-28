@@ -2,7 +2,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { createConductor } from '../engine/conductor.ts'
+import { createConductor, ERA_CRUSH } from '../engine/conductor.ts'
 import { BUILTIN, LANDSCAPES } from '../engine/landscapes/index.ts'
 import { validateLandscape } from '../engine/validate.ts'
 import { createRng } from '../engine/rng.ts'
@@ -131,9 +131,8 @@ test('hold loops the section exactly', () => {
 
 test('built-in landscapes plan exactly as pinned', () => {
   // SHA-256 of the plans over scripted sessions on every built-in (last set
-  // for engine 1.3.0: Era replaces Grit, so the sessions turn Era and the
-  // plans carry its voices and crush; at era 0.5 they match 1.2.0 apart
-  // from fx): a landscape without `written` must plan byte for byte the same.
+  // for engine 1.3.2: Era's crush and tape end lower; notes and drums are
+  // those of 1.3.0): a landscape without `written` must plan byte for byte the same.
   // Change the hash only for a deliberate change to the composer or conductor.
   const h = createHash('sha256')
   const ids = BUILTIN.map(l => l.id)
@@ -150,7 +149,7 @@ test('built-in landscapes plan exactly as pinned', () => {
       h.update(JSON.stringify(c.nextBar()))
     }
   }
-  assert.equal(h.digest('hex'), '5740fb352a2c93e7b04f5669e65fc14c5f1fa0054e31a118ff0f3499ac3391ff')
+  assert.equal(h.digest('hex'), 'a8f9690ab98141dbfcc476bc331b73841f432b58eada683da8cef660822cce91')
 })
 
 /**
@@ -526,7 +525,7 @@ test('Era changes voices only at a phrase start; its fx move at once', () => {
     assert.deepEqual(turned[i]!.notes, base[i]!.notes, `bar ${i}`)
     assert.deepEqual(turned[i]!.drums, base[i]!.drums, `bar ${i}`)
   }
-  assert.equal(turned[11]!.fx.crush, 1)
+  assert.equal(turned[11]!.fx.crush, ERA_CRUSH)
   assert.equal(turned[11]!.fx.grit, 0)
   assert.equal(base[11]!.fx.crush, 0)
   assert.ok(turned[16]!.notes.every(n => CHIP_VOICES.has(n.voice)))

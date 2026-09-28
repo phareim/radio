@@ -51,9 +51,9 @@ function restoreControls(): Controls {
   if (typeof saved.landscape === 'string') c.landscape = saved.landscape
   c.intensity = Math.round(n(saved.intensity, 0, 4, c.intensity)) as Controls['intensity']
   c.mood = n(saved.mood, 0, 1, c.mood)
-  c.space = n(saved.space, 0, 1, c.space)
   // An old saved `grit` (the knob Era replaced) is ignored: Era starts in the middle.
   c.era = n(saved.era, 0, 1, c.era)
+  c.space = c.era
   c.density = n(saved.density, 0, 1, c.density)
   c.tempo = Math.round(n(saved.tempo, -20, 20, c.tempo))
   c.hold = saved.hold === true
@@ -102,6 +102,8 @@ function landscapeOf(id: string): Landscape {
 }
 
 function set(patch: Partial<Controls>): void {
+  // Era carries Space: dry at 8-bit, vast at analog.
+  if (patch.era !== undefined) patch = { ...patch, space: patch.era }
   const clean: Partial<Controls> = {}
   for (const [k, v] of Object.entries(patch) as Array<[keyof Controls, never]>) {
     if (controls[k] !== v) (clean as Record<string, unknown>)[k] = v
