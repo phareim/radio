@@ -8,6 +8,7 @@ feedback, and play along in jam.
 
 - **PM2:** `radio-api` · **port:** 3033 (127.0.0.1) · **nginx:** `sleeper.phareim.no/radio/` (prefix stripped; `/radio/health` open)
 - **Stack:** Node 22, no npm deps: `node:http`, `node:sqlite`. It imports the engine's TypeScript directly (`engine/validate.ts`, `engine/landscapes/index.ts`, `engine/piece/index.ts`); Node strips the types. Runs with `--no-warnings`.
+- **Start from scratch:** `pm2 start backend/ecosystem.config.cjs && pm2 save` (from the repo root). It clears the starting shell's environment, so the service holds no API keys; `slp` and the painter's `claude` run on the Max login in `~/.claude`. Never `pm2 restart --update-env`.
 - **Deploy:** a push to `main` on `phareim/radio` hits the `sleeper-deploy` webhook, which runs `git pull --ff-only && pm2 restart radio-api`.
 
 ## Files
