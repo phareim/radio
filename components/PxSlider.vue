@@ -38,6 +38,7 @@
  * shortcuts while focused.
  */
 import { computed, ref } from 'vue'
+import { haptic } from '~/composables/useHaptics'
 
 const props = withDefaults(defineProps<{
   modelValue: number
@@ -90,7 +91,10 @@ function fromX(clientX: number): void {
   const segs = props.segments
   const lit = props.bipolar ? Math.round(t * segs) : Math.ceil(t * segs - 0.25)
   const v = quantise(props.min + (Math.max(0, lit) / segs) * (props.max - props.min))
-  if (v !== props.modelValue) emit('update:modelValue', v)
+  if (v !== props.modelValue) {
+    haptic()
+    emit('update:modelValue', v)
+  }
 }
 
 function down(e: PointerEvent): void {
