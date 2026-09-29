@@ -11,7 +11,7 @@ works, with editable code cells running it in the page (Norwegian):
 ## The web app
 
 Nuxt 3 on a Cloudflare Worker (`radio-web`, custom domain `radio.phareim.no`),
-open to anyone with the link, no login needed: listening, thumbs, notes,
+open to anyone with the link, no login needed: listening, thumbs,
 composing and settings. A listener without a Reader session is a guest,
 named by a random id in the `radio_guest` cookie (so their channels and
 settings follow that browser); a Reader session names them by email (every
@@ -31,12 +31,13 @@ components/
   IntensityBar.vue         STILL … SURGE
   PxSlider.vue             segmented knobs (mood, era, density, tempo)
   LayerStrip.vue           the ten layers lit by level, entries counting down
-  CommentBox.vue           words after ▲ / ▼ / NOTE
+  CommentBox.vue           words after ▲ / ▼
+  TownChip.client.vue      ⌂ TOWN back to phareim.no, in the transport row
   ComposeDialog.vue        ask Opus for a place, wait for the job
   PxText.vue               pixel text that keeps b d i j m s u a lower-case (Am7, Bb)
 composables/
   useRadio.ts              controls, the conductor and player, HUD state
-  useFeedback.ts           thumbs and notes, with an outbox in localStorage
+  useFeedback.ts           thumbs and their words, with an outbox in localStorage
   usePlaces.ts             your composed places: load, compose job, remove
   useChannels.ts           which channels show: this browser, or a member's settings on radio-api
   useAuto.ts               AUTO: slow drift from place to place
@@ -52,8 +53,9 @@ scripts/make-icons.py      favicon, apple-touch and manifest icons (Pillow)
   Era also sets the engine's `space` (`space = era`): dry at 8-bit, vast at
   analog.
 - Keys: Space play/pause, 1–9 and 0 places, ← → previous/next place, ↑ ↓
-  intensity, H hold, A auto, G glide on, D dim, + / − thumbs, N note; as a
-  guest L goes to Reader's login. Ignored while typing.
+  intensity, H hold, A auto, G glide on, D dim, + / − thumbs, Esc back to
+  the town (when the visit came from it); as a guest L goes to Reader's
+  login. Ignored while typing.
 - Channels: composed places are private to whoever composed them (radio-api
   keeps an owner per landscape; the Worker passes the listener as
   `X-Radio-User`: an email, or `<guest id>@guest`, plus `X-Radio-Ip`, a
@@ -64,7 +66,7 @@ scripts/make-icons.py      favicon, apple-touch and manifest icons (Pillow)
   When a fresh session answer names another listener,
   `useAuth` drops the last member's copies in this browser: composed
   channels, the compose job, hidden channels, the service worker's API
-  cache, and their unsent notes if someone else signed in. Offline, the
+  cache, and their unsent feedback if someone else signed in. Offline, the
   service worker's cached session answer stands.
 - DIM (`radio.calm`) hides everything but the picture; AUTO, ▶▶ and SHOW
   stay in the corner and fade after a few seconds without the pointer.

@@ -2,15 +2,16 @@
   <button
     v-if="fromTown"
     type="button"
-    class="px-btn px-btn--dim town"
+    class="px-btn px-btn--dim"
     title="BACK TO THE TOWN [ESC]"
     aria-label="Back to the town on phareim.no"
     @click="leave"
-  >⌂ TOWN</button>
+  >⌂<span class="town__word"> TOWN</span></button>
 </template>
 
 <script setup lang="ts">
-// Arrived from the town on phareim.no (its beach booth links here): a way back.
+// Arrived from the town on phareim.no (its beach booth links here): a way back,
+// in the deck's transport row after the thumbs (hidden with the deck in DIM).
 // `?from=phareim` or a phareim.no referrer switches it on, and sessionStorage
 // keeps it on across reloads. History-back when the town is the previous page,
 // so the hero stands where they left; otherwise a plain link home.
@@ -49,10 +50,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 </script>
 
 <style scoped>
-.town {
-  position: fixed;
-  z-index: 30;
-  top: calc(10px + var(--safe-t, 0px));
-  left: calc(10px + var(--safe-l, 0px));
+/* Phones: just the house, a square like the thumbs, so the transport row fits. */
+@media (max-width: 700px) {
+  .town__word { display: none; }
 }
 </style>

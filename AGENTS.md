@@ -15,7 +15,7 @@ Opus does; Opus can also compose new landscapes.
 | Pieces for jam (format, notation, piece conductor, landscape derivation, growing, pattern library) | `engine/piece/` | `docs/piece.md` |
 | Web app (Nuxt 3 Worker, Reader login, proxies to the backend) | repo root | `README.md` |
 | iPhone haptics: an invisible native `switch` over every button and slider track; a real touch ticks, script clicks do not (iOS 26.5+); slider ticks on tap only (verified on iOS 26, 2026-09-29) | `plugins/haptics.client.ts` | header comment |
-| Town chip: `⌂ TOWN` and Escape back to phareim.no, shown only when the visit came from it (`?from=phareim` or a phareim.no referrer; 2026-09-28) | `components/TownChip.client.vue` | header comment |
+| Town chip: `⌂ TOWN` and Escape back to phareim.no, in the transport row after the thumbs (where NOTE was; NOTE is gone, feedback is ▲ or ▼), shown only when the visit came from it (`?from=phareim` or a phareim.no referrer; 2026-09-29) | `components/TownChip.client.vue` | header comment |
 | Backend `radio-api` on Sleeper (feedback, compose, review, painting scenes for composed channels) | `backend/` | `backend/README.md` |
 
 ## Rules

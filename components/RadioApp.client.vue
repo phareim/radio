@@ -49,8 +49,8 @@
         <template v-if="allowed">
           <button type="button" class="px-btn deck__thumb" :disabled="!started" title="I LIKE THIS [+]" aria-label="Thumbs up" @click="rate(1)">▲</button>
           <button type="button" class="px-btn px-btn--pink deck__thumb" :disabled="!started" title="NOT THIS [-]" aria-label="Thumbs down" @click="rate(-1)">▼</button>
-          <button type="button" class="px-btn px-btn--dim deck__note" :disabled="!started" title="A NOTE ON THIS MOMENT [N]" @click="rate(0)">NOTE</button>
         </template>
+        <TownChip class="deck__town" />
         <button
           type="button"
           class="px-btn px-btn--gold deck__hold"
@@ -299,7 +299,6 @@ function onKey(e: KeyboardEvent): void {
   else if (k === 'c' || k === 'C') { if (!e.repeat) channelsOpen.value = true }
   else if (allowed.value && started.value && (k === '+' || k === '=' || e.code === 'NumpadAdd')) { if (!e.repeat) void rate(1) }
   else if (allowed.value && started.value && (k === '-' || k === '_' || e.code === 'NumpadSubtract')) { if (!e.repeat) void rate(-1) }
-  else if (allowed.value && started.value && (k === 'n' || k === 'N')) { if (!e.repeat) void rate(0) }
   // A way in for Petter on a new device; visitors never need it.
   else if (guest.value && (k === 'l' || k === 'L')) window.location.href = loginUrl()
   else handled = false
@@ -389,7 +388,7 @@ onBeforeUnmount(() => {
 .deck__play { min-width: 128px; height: 36px; padding: 0 14px; }
 .deck__play.on, .deck__play.on:hover { color: var(--bg); background: var(--pink); box-shadow: 0 -2px 0 0 var(--pink), 0 2px 0 0 var(--pink), -2px 0 0 0 var(--pink), 2px 0 0 0 var(--pink), 0 0 14px color-mix(in srgb, var(--pink) 55%, transparent); }
 .deck__thumb { width: 40px; height: 36px; padding: 0; }
-.deck__note { height: 36px; }
+.deck__town { height: 36px; }
 .deck__hold { height: 36px; margin-left: auto; }
 .deck__hold.on, .deck__hold.on:hover { color: var(--bg); background: var(--gold); }
 
@@ -456,8 +455,9 @@ onBeforeUnmount(() => {
   }
   .deck__transport { gap: 10px; flex-wrap: nowrap; }
   .deck__play { min-width: 0; flex: 1; padding: 0 8px; }
-  .deck__thumb { width: 40px; flex: none; }
-  .deck__note, .deck__hold { flex: none; padding: 0 8px; margin: 0; }
+  .deck__thumb, .deck__town { width: 40px; flex: none; }
+  .deck__town { padding: 0; }
+  .deck__hold { flex: none; padding: 0 8px; margin: 0; }
   .deck__knobs { gap: 4px; }
   .app__working { top: calc(72px + var(--safe-t)); }
 }
