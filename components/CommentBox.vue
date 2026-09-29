@@ -1,8 +1,8 @@
 <template>
-  <div v-if="draft" class="cb px-box" :class="tone" role="dialog" aria-label="Add a note">
+  <div v-if="draft" class="cb px-box" :class="tone" role="dialog" aria-label="Why?">
     <p class="cb__head">
-      <span class="cb__mark">{{ draft.rating === 1 ? '▲' : draft.rating === -1 ? '▼' : '♪' }}</span>
-      <span>{{ draft.rating === 0 ? 'NOTE' : 'WHY?' }}</span>
+      <span class="cb__mark">{{ draft.rating === 1 ? '▲' : '▼' }}</span>
+      <span>WHY?</span>
       <span class="cb__at"><PxText :text="where" /></span>
     </p>
     <textarea
@@ -11,12 +11,12 @@
       class="cb__field"
       rows="2"
       maxlength="1000"
-      :placeholder="draft.rating === 0 ? 'what do you hear...' : 'a few words, or just close'"
+      placeholder="a few words, or just close"
       @keydown.enter.exact.prevent="send"
       @keydown.esc.prevent="close"
     />
     <div class="cb__row">
-      <button type="button" class="px-btn px-btn--dim" @click="close">{{ draft.rating === 0 ? 'CANCEL' : 'CLOSE' }}</button>
+      <button type="button" class="px-btn px-btn--dim" @click="close">CLOSE</button>
       <button type="button" class="px-btn px-btn--pink" :disabled="!text.trim()" @click="send">SEND ↵</button>
     </div>
   </div>
@@ -24,7 +24,7 @@
 
 <script setup lang="ts">
 /**
- * The small box that opens after ▲ / ▼ (the thumb is already saved) or NOTE:
+ * The small box that opens after ▲ / ▼ (the thumb is already saved):
  * words go on the same feedback. Enter sends, Esc closes.
  */
 import { computed, nextTick, ref, watch } from 'vue'
@@ -33,7 +33,7 @@ const { draft, comment, dismiss } = useFeedback()
 const text = ref('')
 const field = ref<HTMLTextAreaElement | null>(null)
 
-const tone = computed(() => (draft.value?.rating === -1 ? 'cb--down' : draft.value?.rating === 1 ? 'cb--up' : 'cb--note'))
+const tone = computed(() => (draft.value?.rating === 1 ? 'cb--up' : 'cb--down'))
 const where = computed(() => {
   const s = draft.value?.snapshot
   if (!s) return ''

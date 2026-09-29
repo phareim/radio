@@ -1,8 +1,8 @@
 /**
- * Thumbs and notes. A thumb is saved the moment it is pressed, with the
- * snapshot of that moment; the comment box that opens afterwards PATCHes
- * words onto it. A note (rating 0) is posted when its words are sent, with
- * the snapshot taken when NOTE was pressed.
+ * Thumbs. A thumb is saved the moment it is pressed, with the snapshot of
+ * that moment; the comment box that opens afterwards PATCHes words onto it.
+ * Words sent before the thumb's save has answered go as a comment-only
+ * entry (rating 0) with the same snapshot.
  *
  * Anything the backend does not take (offline, local dev) waits in an outbox
  * in localStorage and is sent with the next successful save.
@@ -59,12 +59,11 @@ async function flush(): Promise<void> {
   }
 }
 
-/** ▲ (1) or ▼ (-1): save now, then open the comment box. NOTE (0): open the box; saved on send. */
-async function rate(rating: Feedback['rating']): Promise<void> {
+/** ▲ (1) or ▼ (-1): save now, then open the comment box. */
+async function rate(rating: 1 | -1): Promise<void> {
   const { snapshot } = useRadio()
   const snap = snapshot()
   draft.value = { rating, snapshot: snap, id: null, local: null }
-  if (rating === 0) return
   const d = draft.value
   try {
     d.id = await post({ rating, comment: '', snapshot: snap })
