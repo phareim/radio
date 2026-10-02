@@ -30,6 +30,6 @@
     "esbuild": "^0.28.2",
     "typescript": "^5.9.3",
     "vue-tsc": "^3.3.11",
-    "wrangler": "^4.40.0"
+    "wrangler": "^4.147.0"
   }
 }
