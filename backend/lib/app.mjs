@@ -98,8 +98,15 @@ export function guestLimits(env = process.env) {
     compose: n('RADIO_GUEST_COMPOSE_PER_DAY', 3),
     composeAll: n('RADIO_GUEST_COMPOSE_TOTAL_PER_DAY', 15),
     feedback: n('RADIO_GUEST_FEEDBACK_PER_DAY', 100),
+    devices: n('RADIO_GUEST_DEVICES_PER_DAY', 20),
   };
 }
+
+/** The most a device may report the first time: a day of listening before its first answer. */
+const PLAYED_FIRST_MAX = 24 * 3600;
+/** Leeway on top of the clock when a running total grows (seconds). */
+const PLAYED_SLACK = 120;
+const PLAYED_MAX = 20 * 365 * 24 * 3600;
 
 const dayAgo = () => new Date(Date.now() - 24 * 3600_000).toISOString();
 
@@ -214,6 +221,34 @@ export function createApp({ db, apiKey, corsOrigins = [], ask, paint = startPain
       db.prepare('INSERT INTO settings (user, json, updated_at) VALUES (?, ?, ?) ON CONFLICT(user) DO UPDATE SET json = excluded.json, updated_at = excluded.updated_at')
         .run(u, JSON.stringify(settings), at);
       return { settings, updatedAt: at };
+    }],
+
+    // The device's running total of seconds played, as the page counted it.
+    // A total never goes down and never grows faster than the clock, so a
+    // report sent twice counts once and nobody can talk the sum up.
+    ['POST', /^\/played$/, async (req) => {
+      const u = needListener(req);
+      const b = await readJson(req);
+      if (typeof b.device !== 'string' || !/^[a-f0-9]{16,64}$/.test(b.device)) throw new HttpError(400, 'device must be 16-64 hex chars');
+      if (!Number.isInteger(b.seconds) || b.seconds < 0 || b.seconds > PLAYED_MAX) throw new HttpError(400, 'seconds must be a whole number, 0 or more');
+      const at = now();
+      const row = db.prepare('SELECT seconds, updated_at FROM played WHERE listener = ? AND device = ?').get(u, b.device);
+      let seconds;
+      if (row) {
+        const elapsed = Math.max(0, Math.floor((Date.parse(at) - Date.parse(row.updated_at)) / 1000));
+        seconds = Math.max(row.seconds, Math.min(b.seconds, row.seconds + elapsed + PLAYED_SLACK));
+        db.prepare('UPDATE played SET seconds = ?, updated_at = ? WHERE listener = ? AND device = ?').run(seconds, at, u, b.device);
+      } else {
+        const ip = listenerIp(req);
+        if (!isOwner(req)) {
+          const fresh = db.prepare('SELECT COUNT(*) AS n FROM played WHERE created_at > ? AND (listener = ? OR ip = ?)').get(dayAgo(), u, ip ?? '').n;
+          if (fresh >= limits.devices) throw new HttpError(429, 'too many new devices for one day');
+        }
+        seconds = Math.min(b.seconds, PLAYED_FIRST_MAX);
+        db.prepare('INSERT INTO played (listener, device, seconds, ip, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)').run(u, b.device, seconds, ip, at, at);
+      }
+      const sum = (where, ...args) => db.prepare(`SELECT COALESCE(SUM(seconds), 0) AS n FROM played ${where}`).get(...args).n;
+      return { device: seconds, mine: sum('WHERE listener = ?', u), all: sum('') };
     }],
 
     ['POST', /^\/compose$/, async (req) => {

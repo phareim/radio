@@ -56,7 +56,8 @@ function restoreControls(): Controls {
   c.space = c.era
   c.density = n(saved.density, 0, 1, c.density)
   c.tempo = Math.round(n(saved.tempo, -20, 20, c.tempo))
-  c.hold = saved.hold === true
+  // The radio has no HOLD button any more; a saved one would loop for good.
+  c.hold = false
   return c
 }
 

@@ -26,7 +26,7 @@ pages/index.vue            the shell, RadioApp inside <ClientOnly>
 components/
   RadioApp.client.vue      layout, keyboard, media session, hidden <audio>
   SceneWindow.vue          the canvas (scene/createScene) and the HUD over it
-  StationDial.vue          the channels shown (1–0), then CHANNELS
+  StationDial.vue          the channels shown (1–0), then CHANNELS; compact: just ◀ NAME ▶
   ChannelsDialog.vue       show/hide each channel, remove your own, + NEW PLACE
   IntensityBar.vue         STILL … SURGE
   PxSlider.vue             segmented knobs (mood, era, density, tempo)
@@ -41,6 +41,7 @@ composables/
   usePlaces.ts             your composed places: load, compose job, remove
   useChannels.ts           which channels show: this browser, or a member's settings on radio-api
   useAuto.ts               AUTO: slow drift from place to place
+  usePlayed.ts             minutes played: counted here, reported to radio-api
 server/api/                proxies to radio-api; listener.ts names the listener, the owner's routes use requireAllowedUser
 server/utils/              readerSession.ts + cloudflare.ts (vendored Reader auth), radioApi.ts
 scripts/make-icons.py      favicon, apple-touch and manifest icons (Pillow)
@@ -53,9 +54,27 @@ scripts/make-icons.py      favicon, apple-touch and manifest icons (Pillow)
   Era also sets the engine's `space` (`space = era`): dry at 8-bit, vast at
   analog.
 - Keys: Space play/pause, 1–9 and 0 places, ← → previous/next place, ↑ ↓
-  intensity, H hold, A auto, G glide on, D dim, + / − thumbs, Esc back to
-  the town (when the visit came from it); as a guest L goes to Reader's
-  login. Ignored while typing.
+  intensity, A auto, G glide on, D dim, C channels, + / − thumbs, Esc back
+  to the town (when the visit came from it); as a guest L goes to Reader's
+  login. Ignored while typing. There is no HOLD button (removed 2026-10-13;
+  the engine still has the control, and a saved `hold` is dropped on load).
+- Minutes played (`composables/usePlayed.ts`), at the right end of the
+  transport row: yours in pink, every listener's together in small text
+  under it. The page counts seconds of the audio clock (it stands still
+  while the music is paused or the device sleeps) and keeps them in
+  `radio.played`, per device (`radio.device`, a random id). The device's
+  running total goes to radio-api (`POST /api/played`) when the page starts
+  and about once an hour, best effort; the page works offline, so a failed
+  report is just tried again an hour later. "Yours" is the sum over every
+  device for a signed-in member and this device for a guest. When another
+  listener takes over the browser the local count starts from what radio-api
+  has for them on this device; minutes not yet reported are lost.
+- Compact layout (`COMPACT` in `RadioApp.client.vue`): when the window is
+  at most 500 px high, at most 340 px wide, wider than 3:1 and at most
+  700 px high, or narrower than 2:5, the layer strip, the knobs and the
+  station grid go, and the deck is one row: play, ◀ place name ▶, the
+  minutes (under 480 px wide the name gets its own row). Thumbs and
+  CHANNELS are not shown there; the keys still work.
 - Channels: composed places are private to whoever composed them (radio-api
   keeps an owner per landscape; the Worker passes the listener as
   `X-Radio-User`: an email, or `<guest id>@guest`, plus `X-Radio-Ip`, a

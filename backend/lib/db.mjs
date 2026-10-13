@@ -1,4 +1,4 @@
-// SQLite store (node:sqlite). One file, seven tables.
+// SQLite store (node:sqlite). One file, eight tables.
 
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
@@ -84,6 +84,20 @@ CREATE TABLE IF NOT EXISTS jam_snippets (
   created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS jam_snippets_owner ON jam_snippets (owner);
+
+-- Seconds of music played, one row per listener and device. The page counts
+-- on its own (it plays offline) and reports the device's running total, so
+-- a report sent twice counts once. ip is the Worker's hash, for the limit
+-- on new devices.
+CREATE TABLE IF NOT EXISTS played (
+  listener TEXT NOT NULL,
+  device TEXT NOT NULL,
+  seconds INTEGER NOT NULL,
+  ip TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (listener, device)
+);
 `;
 
 export function openDb(file) {
