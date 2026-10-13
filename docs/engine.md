@@ -44,7 +44,7 @@ where a musician would put them:
 | era | voices and kits at the next phrase start (layer by layer, see Era); crush and tape glide over about a bar |
 | space | glides over about a bar. The radio has no Space knob: Era sets it too (`space = era`), dry at 8-bit, vast at analog; jam keeps its own |
 | tempo | glides across the next phrase (eased at both ends) |
-| hold | freezes progression and motif; the section loops until released |
+| hold | freezes progression and motif; the section loops until released (the radio has no HOLD button since 2026-10-13; the control is still the engine's) |
 
 The conductor plans lazily, one bar at a time, so a new control value
 re-plans from wherever the music is.

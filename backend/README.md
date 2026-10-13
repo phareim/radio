@@ -2,7 +2,7 @@
 
 Sleeper backend for radio.phareim.no and its sister instrument
 jam.phareim.no. The music runs in the browser; this service stores
-thumbs-up/down feedback and jam's pieces, and asks Opus (through `slp`, on
+thumbs-up/down feedback, minutes played and jam's pieces, and asks Opus (through `slp`, on
 Petter's Claude Max subscription) to compose new landscapes, review the
 feedback, and play along in jam.
 
@@ -17,7 +17,7 @@ feedback, and play along in jam.
 server.mjs        entrypoint: env, DB, listen
 lib/app.mjs       routes, auth, CORS
 lib/jam.mjs       jam's routes (/jam/*), mounted by app.mjs
-lib/db.mjs        schema (feedback, landscapes, jobs, settings, reviews, jam_pieces, jam_snippets)
+lib/db.mjs        schema (feedback, landscapes, jobs, settings, reviews, jam_pieces, jam_snippets, played)
 lib/jobs.mjs      job queue: one Opus call at a time
 lib/opus.mjs      spawns slp -p - --model opus (cwd = OS temp dir, 6 min timeout)
 lib/engine.mjs    loads the engine modules and the schema text for prompts
@@ -41,6 +41,7 @@ All JSON. Everything except `GET /health` needs `Authorization: Bearer $RADIO_AP
 | GET | `/feedback/stats` | | `{stats: [{landscape, up, down, comments, total, unreviewed}]}` |
 | GET | `/landscapes` | | `{landscapes: Landscape[]}`: Opus-composed, not hidden, oldest first, each with `origin: 'opus'` and `prompt` |
 | DELETE | `/landscapes/:id` | | `{id, hidden: true}` (kept in the DB, just hidden) |
+| POST | `/played` | `{device: 16–64 hex chars, seconds: whole number}` | `{device, mine, all}` in seconds (Played below) |
 | POST | `/compose` | `{prompt, base?: built-in id}` | 202 `{job}` |
 | POST | `/review` | | 202 `{job}` |
 | GET | `/reviews` | | `{reviews: [{id, at, feedbackFrom, feedbackTo, path, summary}]}` |
@@ -80,11 +81,28 @@ is the only one who may follow a review job. Everyone else gets, per rolling
 | `RADIO_GUEST_COMPOSE_PER_DAY` | 3 | composes per listener, and per IP hash |
 | `RADIO_GUEST_COMPOSE_TOTAL_PER_DAY` | 15 | composes by all non-owners together |
 | `RADIO_GUEST_FEEDBACK_PER_DAY` | 100 | feedback per listener or IP hash |
+| `RADIO_GUEST_DEVICES_PER_DAY` | 20 | new devices reporting minutes played, per listener or IP hash |
 
 A non-owner's compose job carries `guest: 1` and `ip` in its input (never
 handed back). Feedback keeps the IP hash in `feedback.ip`; `GET /feedback`
 shows `by`: the member's email, or `guest`. Paintings stay the owner's
 (`RADIO_PAINT_OWNERS`), so a guest's channel keeps its borrowed scene.
+
+## Played
+
+The page counts the seconds of music it has played and keeps the count on
+the device, since the radio plays without a network. When it starts, and
+about once an hour, it sends `POST /played` with a random device id and the
+device's running total. The table `played` has one row per listener and
+device. A total, not a step: the same report twice counts once.
+
+- The stored total never goes down. A device with cleared storage reads its
+  old total from the answer (`device`) and counts on from there.
+- It grows no faster than the clock: at most the seconds since the row's
+  last report plus 120. A device's first report is capped at 24 hours.
+- `mine` is the listener's sum over their devices: every device of a
+  signed-in member, the one browser of a guest. `all` is every listener's.
+- Guests' minutes stay under the guest id when they sign in.
 
 ## Compose
 

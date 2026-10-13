@@ -345,3 +345,40 @@ test('guests: daily limits per listener, per IP and in total; the owner has none
   assert.equal((await api('GET', `/jobs/${review.body.job.id}`)).status, 200)
   await drain()
 })
+
+test('played: a running total per device, summed per listener and for everyone', async () => {
+  const dev = (n) => String(n).repeat(32)
+  const played = (seconds, device, who) => api('POST', '/played', { device, seconds }, who)
+  /** As if the last report from this device came `s` seconds ago. */
+  const age = (user, device, s) => db.prepare('UPDATE played SET updated_at = ? WHERE listener = ? AND device = ?')
+    .run(new Date(Date.now() - s * 1000).toISOString(), user, device)
+  assert.equal((await played(60, dev(1), { user: null })).status, 401)
+  assert.equal((await played(60, 'not-hex')).status, 400)
+  assert.equal((await played(1.5, dev(1))).status, 400)
+  assert.equal((await played(-1, dev(1))).status, 400)
+  // The first report makes the row; the same total sent again counts once.
+  assert.deepEqual((await played(600, dev(1))).body, { device: 600, mine: 600, all: 600 })
+  assert.deepEqual((await played(600, dev(1))).body, { device: 600, mine: 600, all: 600 })
+  // A total never goes down (cleared storage on the device): the answer hands it back.
+  assert.equal((await played(0, dev(1))).body.device, 600)
+  // It grows no faster than the clock since the last report.
+  assert.equal((await played(9000, dev(1))).body.device, 600 + 120)
+  age(USER, dev(1), 3600)
+  const hour = (await played(9000, dev(1))).body.device
+  assert.ok(hour >= 720 + 3600 + 120 && hour <= 720 + 3600 + 125, String(hour))
+  // A second device adds to the listener's sum; a first report is capped at a day.
+  const two = (await played(999_999, dev(2))).body
+  assert.deepEqual([two.device, two.mine, two.all], [86_400, hour + 86_400, hour + 86_400])
+  // Another listener, even on the same device id, has their own sum; `all` is everyone's.
+  const other = (await played(300, dev(1), { user: 'other@example.com' })).body
+  assert.deepEqual(other, { device: 300, mine: 300, all: hour + 86_400 + 300 })
+  // Guests: 20 new devices a day per listener or IP; the owner has no such limit.
+  const guest = { user: `${'9'.repeat(32)}@guest`, headers: { 'x-radio-ip': 'c'.repeat(16) } }
+  const hex = (i) => i.toString(16).padStart(32, 'a')
+  for (let i = 0; i < 20; i++) assert.equal((await played(1, hex(i), guest)).status, 200)
+  assert.equal((await played(1, hex(20), guest)).status, 429)
+  assert.equal((await played(1, hex(21), { user: `${'8'.repeat(32)}@guest`, headers: guest.headers })).status, 429)
+  // A device already known still reports.
+  assert.equal((await played(2, hex(0), guest)).status, 200)
+  for (let i = 0; i < 25; i++) assert.equal((await played(1, hex(100 + i))).status, 200)
+})

@@ -1,7 +1,7 @@
 <template>
   <div
     class="app"
-    :class="{ 'app--narrow': narrow, 'app--calm': calm, 'app--idle': calm && idle }"
+    :class="{ 'app--narrow': narrow, 'app--compact': compact, 'app--calm': calm, 'app--idle': calm && idle }"
     @pointermove="wake"
     @pointerdown="wake"
   >
@@ -34,7 +34,7 @@
         </div>
       </template>
     </SceneWindow>
-    <LayerStrip v-show="!calm" class="app__strip" />
+    <LayerStrip v-show="!calm && !compact" class="app__strip" />
 
     <div v-show="!calm" class="app__deck">
       <div class="deck__transport">
@@ -45,26 +45,25 @@
           :aria-label="playing ? 'Pause' : 'Play'"
           title="PLAY / PAUSE [SPACE]"
           @click="toggle"
-        >{{ playing ? '❚❚ PAUSE' : '▶ PLAY' }}</button>
-        <template v-if="allowed">
+        >{{ playing ? '❚❚' : '▶' }}<span class="deck__word">{{ playing ? ' PAUSE' : ' PLAY' }}</span></button>
+        <template v-if="allowed && !compact">
           <button type="button" class="px-btn deck__thumb" :disabled="!started" title="I LIKE THIS [+]" aria-label="Thumbs up" @click="rate(1)">▲</button>
           <button type="button" class="px-btn px-btn--pink deck__thumb" :disabled="!started" title="NOT THIS [-]" aria-label="Thumbs down" @click="rate(-1)">▼</button>
         </template>
         <TownChip class="deck__town" />
-        <button
-          type="button"
-          class="px-btn px-btn--gold deck__hold"
-          :class="{ on: controls.hold }"
-          :aria-pressed="controls.hold"
-          :disabled="!started"
-          title="KEEP THIS PROGRESSION AND MOTIF LOOPING [H]"
-          @click="set({ hold: !controls.hold })"
-        >HOLD</button>
+        <p
+          class="deck__played"
+          title="MINUTES YOU HAVE PLAYED, AND EVERY LISTENER TOGETHER"
+          :aria-label="`${mine} minutes played by you${everyone === null ? '' : `, ${everyone} by everyone`}`"
+        >
+          <span>{{ count(mine) }} MIN</span>
+          <span v-if="everyone !== null" class="deck__all">{{ count(everyone) }} IN ALL</span>
+        </p>
       </div>
 
-      <StationDial class="deck__dial" @channels="channelsOpen = true" />
+      <StationDial class="deck__dial" :compact="compact" @channels="channelsOpen = true" />
 
-      <div class="deck__knobs">
+      <div v-show="!compact" class="deck__knobs">
         <IntensityBar />
         <PxSlider :model-value="controls.mood" label="MOOD" left="BRIGHT" right="DARK" :compact="narrow" color="#cfc6ff" @update:model-value="set({ mood: $event })" />
         <PxSlider :model-value="controls.era" label="ERA" left="8-BIT" right="ANALOG" bipolar :compact="narrow" color="#ff8a3d" @update:model-value="set({ era: $event })" />
@@ -116,6 +115,11 @@ const { rate, toast, say, flush } = useFeedback()
 const { compose, refresh, resume } = usePlaces()
 const { allowed, guest, fetchSession, loginUrl } = useAuth()
 const { auto, toggleAuto, glideOn } = useAuto()
+const played = usePlayed()
+const { mine, all: everyone } = played
+
+/** 12345 → '12 345'. */
+const count = (n: number) => String(n).replace(/\B(?=(\d{3})+$)/g, ' ')
 
 // ---- the quiet view: just the picture, and AUTO / ▶▶ / SHOW in a corner that fades when left alone
 
@@ -141,6 +145,13 @@ const channelsOpen = ref(false)
 const { visible, sync } = useChannels()
 const composing = computed(() => compose.value.phase === 'working')
 const narrow = ref(false)
+/**
+ * No room for the knobs: a window much wider than tall, much taller than
+ * wide, or just small. The deck is then play, the place between ◀ and ▶,
+ * and the minutes.
+ */
+const COMPACT = '(max-height: 500px), (max-width: 340px), (min-aspect-ratio: 3/1), (max-aspect-ratio: 2/5)'
+const compact = ref(false)
 const audioEl = ref<HTMLAudioElement | null>(null)
 
 // When a compose lands while the box is closed, open it to offer the trip.
@@ -292,7 +303,6 @@ function onKey(e: KeyboardEvent): void {
   else if (k === 'ArrowRight') stepPlace(1)
   else if (k === 'ArrowUp') set({ intensity: Math.min(4, controls.intensity + 1) as Controls['intensity'] })
   else if (k === 'ArrowDown') set({ intensity: Math.max(0, controls.intensity - 1) as Controls['intensity'] })
-  else if (started.value && (k === 'h' || k === 'H')) set({ hold: !controls.hold })
   else if (k === 'a' || k === 'A') { if (!e.repeat) toggleAuto() }
   else if (k === 'g' || k === 'G') { if (!e.repeat) glideOn() }
   else if (k === 'd' || k === 'D') { if (!e.repeat) setCalm(!calm.value) }
@@ -308,21 +318,27 @@ function onKey(e: KeyboardEvent): void {
 // ---- layout --------------------------------------------------------------------
 
 let mq: MediaQueryList | null = null
+let mqCompact: MediaQueryList | null = null
 let offBar: (() => void) | null = null
-const onMq = () => { narrow.value = !!mq?.matches }
+const onMq = () => { narrow.value = !!mq?.matches; compact.value = !!mqCompact?.matches }
 
 onMounted(() => {
   if (import.meta.dev) (window as unknown as Record<string, unknown>).__radioDev = { radio, places: usePlaces(), feedback: useFeedback() }
   mq = window.matchMedia('(max-width: 700px)')
+  mqCompact = window.matchMedia(COMPACT)
   onMq()
   mq.addEventListener('change', onMq)
+  mqCompact.addEventListener('change', onMq)
   window.addEventListener('keydown', onKey)
   wireMediaSession()
   offBar = radio.onBar(onSessionBar)
   calm.value = load<boolean>(CALM_KEY, false) === true
   if (calm.value) wake()
+  played.start()
   void refresh()
   void fetchSession().then((ok) => {
+    // After the session answer, so the minutes go to the listener it named.
+    void played.sync()
     if (!ok) return
     void sync()
     resume()
@@ -334,6 +350,7 @@ onBeforeUnmount(() => {
   offBar?.()
   if (metaTimer) clearTimeout(metaTimer)
   mq?.removeEventListener('change', onMq)
+  mqCompact?.removeEventListener('change', onMq)
   window.removeEventListener('keydown', onKey)
   if (idleTimer) clearTimeout(idleTimer)
 })
@@ -385,12 +402,28 @@ onBeforeUnmount(() => {
     0 -2px 0 0 var(--px-edge), 0 2px 0 0 var(--px-edge), -2px 0 0 0 var(--px-edge), 2px 0 0 0 var(--px-edge),
     0 0 8px color-mix(in srgb, var(--px-edge) 45%, transparent);
 }
-.deck__play { min-width: 128px; height: 36px; padding: 0 14px; }
+.deck__play { min-width: 128px; height: 36px; padding: 0 14px; container-type: inline-size; }
+/* A play button with no room for its word shows the sign alone. */
+@container (max-width: 87px) { .deck__word { display: none; } }
 .deck__play.on, .deck__play.on:hover { color: var(--bg); background: var(--pink); box-shadow: 0 -2px 0 0 var(--pink), 0 2px 0 0 var(--pink), -2px 0 0 0 var(--pink), 2px 0 0 0 var(--pink), 0 0 14px color-mix(in srgb, var(--pink) 55%, transparent); }
 .deck__thumb { width: 40px; height: 36px; padding: 0; }
 .deck__town { height: 36px; }
-.deck__hold { height: 36px; margin-left: auto; }
-.deck__hold.on, .deck__hold.on:hover { color: var(--bg); background: var(--gold); }
+/* Your minutes, and under them everyone's. Pink is you. */
+.deck__played {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 4px;
+  min-height: 36px;
+  margin: 0 0 0 auto;
+  color: var(--pink);
+  line-height: 16px;
+  white-space: nowrap;
+  text-shadow: 2px 2px 0 var(--bg);
+}
+.deck__all { font-size: 8px; line-height: 8px; color: var(--muted); text-shadow: none; }
 
 .app__toast {
   --px-edge: var(--cyan);
@@ -430,35 +463,39 @@ onBeforeUnmount(() => {
   .deck__knobs { gap: 4px; }
 }
 
-/* Phones on their side: the picture keeps the top half, the deck scrolls under it. */
-@media (orientation: landscape) and (max-height: 500px) {
-  .app__strip { display: none !important; }
-  .app__deck {
-    max-height: calc(var(--app-height) * 0.5);
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    padding-top: 10px;
-    gap: 10px 28px;
-  }
-  .deck__knobs { gap: 2px; }
-}
-
 /* Phones: the window on top, the deck stacked under it. */
 @media (max-width: 700px) {
   .app { --pxs-label-w: 88px; }
   .app__deck {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-areas: "transport" "dial" "knobs";
     grid-template-rows: auto auto auto;
     gap: 12px;
     padding: 12px calc(16px + var(--safe-r)) calc(12px + var(--app-safe-bottom)) calc(16px + var(--safe-l));
   }
   .deck__transport { gap: 10px; flex-wrap: nowrap; }
-  .deck__play { min-width: 0; flex: 1; padding: 0 8px; }
+  .deck__play { min-width: 40px; flex: 1; padding: 0 8px; }
   .deck__thumb, .deck__town { width: 40px; flex: none; }
   .deck__town { padding: 0; }
-  .deck__hold { flex: none; padding: 0 8px; margin: 0; }
   .deck__knobs { gap: 4px; }
   .app__working { top: calc(72px + var(--safe-t)); }
+}
+
+/* No room for the knobs (COMPACT above): one row under the picture. */
+.app--compact .app__deck {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 8px calc(16px + var(--safe-r)) calc(8px + var(--app-safe-bottom)) calc(16px + var(--safe-l));
+}
+.app--compact .deck__transport { display: contents; }
+.app--compact .deck__play { flex: none; width: 40px; min-width: 0; padding: 0; }
+.app--compact .deck__dial { order: 1; flex: 1 1 0; }
+.app--compact .deck__played { order: 2; margin-left: 0; }
+/* Too narrow for one row: the place gets its own. */
+@media (max-width: 480px) {
+  .app--compact .deck__dial { order: 3; flex-basis: 100%; }
+  .app--compact .deck__played { margin-left: auto; }
 }
 </style>

@@ -1,5 +1,5 @@
 <template>
-  <div class="dial">
+  <div class="dial" :class="{ 'dial--compact': compact }">
     <div class="dial__read">
       <button class="dial__step" type="button" aria-label="Previous place" @click="step(-1)">◀</button>
       <p class="dial__target" :style="{ color: target.accent }">
@@ -44,6 +44,8 @@
  */
 import { computed, ref, watch } from 'vue'
 
+/** `compact`: only the place's name between ◀ and ▶ (RadioApp, when there is no room for more). */
+defineProps<{ compact?: boolean }>()
 defineEmits<{ channels: [] }>()
 const { visible } = useChannels()
 
@@ -183,6 +185,12 @@ function step(d: number): void {
   .dial__target { justify-content: flex-start; }
   .dial__blurb { justify-content: flex-start; text-align: left; }
 }
+
+/* Compact, at any width: the name between the arrows, nothing else. */
+.dial--compact .dial__blurb, .dial--compact .dial__grid { display: none; }
+.dial--compact .dial__read { grid-template-columns: auto 1fr auto; }
+.dial--compact .dial__step { display: block; width: 40px; height: 36px; }
+.dial--compact .dial__target { justify-content: center; }
 
 /* Narrow: numbered tiles; the name is read out above them. */
 @media (max-width: 700px) {

@@ -8,6 +8,7 @@
  */
 import { load, save } from './storage'
 import { useChannels } from './useChannels'
+import { usePlayed } from './usePlayed'
 
 export const READER_LOGIN = 'https://reader.phareim.no/login'
 
@@ -19,7 +20,8 @@ const MEMBER_KEY = 'radio.member'
  * kept data for (another member, or nobody): drop that member's copies here,
  * both in localStorage and in the service worker's API cache. Their unsent
  * feedback is kept for them across a sign-out, and dropped when someone else
- * signs in.
+ * signs in. Their minutes played stay with them in radio-api; the count here
+ * starts from what the new listener has played on this device.
  */
 async function forgetOtherMember(who: string | null): Promise<void> {
   const before = load<string | null>(MEMBER_KEY, null)
@@ -28,6 +30,7 @@ async function forgetOtherMember(who: string | null): Promise<void> {
   for (const key of ['radio.composed', 'radio.job', 'radio.hidden']) save(key, undefined)
   if (who) save('radio.outbox', undefined)
   useChannels().forget()
+  usePlayed().forget()
   try { await caches.delete('radio-api-v1') } catch { /* no CacheStorage */ }
 }
 

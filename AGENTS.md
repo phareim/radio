@@ -16,7 +16,9 @@ Opus does; Opus can also compose new landscapes.
 | Web app (Nuxt 3 Worker, Reader login, proxies to the backend) | repo root | `README.md` |
 | iPhone haptics: an invisible native `switch` over every button and slider track; a real touch ticks, script clicks do not (iOS 26.5+); slider ticks on tap only (verified on iOS 26, 2026-09-29) | `plugins/haptics.client.ts` | header comment |
 | Town chip: `⌂ TOWN` and Escape back to phareim.no, in the transport row after the thumbs (where NOTE was; NOTE is gone, feedback is ▲ or ▼), shown only when the visit came from it (`?from=phareim` or a phareim.no referrer; 2026-09-29) | `components/TownChip.client.vue` | header comment |
-| Backend `radio-api` on Sleeper (feedback, compose, review, painting scenes for composed channels) | `backend/` | `backend/README.md` |
+| Minutes played: counted in the page on the audio clock, reported to radio-api at start and hourly; shown in the transport row (2026-10-13) | `composables/usePlayed.ts`, `POST /played` | `README.md`, `backend/README.md` (Played) |
+| Compact layout for very wide, very narrow and small windows: play, ◀ place ▶, minutes (2026-10-13) | `COMPACT` in `components/RadioApp.client.vue` | `README.md` |
+| Backend `radio-api` on Sleeper (feedback, compose, review, minutes played, painting scenes for composed channels) | `backend/` | `backend/README.md` |
 
 ## Rules
 
