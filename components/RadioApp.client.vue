@@ -45,7 +45,7 @@
           :aria-label="playing ? 'Pause' : 'Play'"
           title="PLAY / PAUSE [SPACE]"
           @click="toggle"
-        >{{ playing ? '❚❚' : '▶' }}{{ compact ? '' : playing ? ' PAUSE' : ' PLAY' }}</button>
+        >{{ playing ? '❚❚' : '▶' }}<span class="deck__word">{{ playing ? ' PAUSE' : ' PLAY' }}</span></button>
         <template v-if="allowed && !compact">
           <button type="button" class="px-btn deck__thumb" :disabled="!started" title="I LIKE THIS [+]" aria-label="Thumbs up" @click="rate(1)">▲</button>
           <button type="button" class="px-btn px-btn--pink deck__thumb" :disabled="!started" title="NOT THIS [-]" aria-label="Thumbs down" @click="rate(-1)">▼</button>
@@ -150,7 +150,7 @@ const narrow = ref(false)
  * wide, or just small. The deck is then play, the place between ◀ and ▶,
  * and the minutes.
  */
-const COMPACT = '(max-height: 500px), (max-width: 340px), (min-aspect-ratio: 3/1) and (max-height: 700px), (max-aspect-ratio: 2/5)'
+const COMPACT = '(max-height: 500px), (max-width: 340px), (min-aspect-ratio: 3/1), (max-aspect-ratio: 2/5)'
 const compact = ref(false)
 const audioEl = ref<HTMLAudioElement | null>(null)
 
@@ -402,7 +402,9 @@ onBeforeUnmount(() => {
     0 -2px 0 0 var(--px-edge), 0 2px 0 0 var(--px-edge), -2px 0 0 0 var(--px-edge), 2px 0 0 0 var(--px-edge),
     0 0 8px color-mix(in srgb, var(--px-edge) 45%, transparent);
 }
-.deck__play { min-width: 128px; height: 36px; padding: 0 14px; }
+.deck__play { min-width: 128px; height: 36px; padding: 0 14px; container-type: inline-size; }
+/* A play button with no room for its word shows the sign alone. */
+@container (max-width: 87px) { .deck__word { display: none; } }
 .deck__play.on, .deck__play.on:hover { color: var(--bg); background: var(--pink); box-shadow: 0 -2px 0 0 var(--pink), 0 2px 0 0 var(--pink), -2px 0 0 0 var(--pink), 2px 0 0 0 var(--pink), 0 0 14px color-mix(in srgb, var(--pink) 55%, transparent); }
 .deck__thumb { width: 40px; height: 36px; padding: 0; }
 .deck__town { height: 36px; }
@@ -465,14 +467,14 @@ onBeforeUnmount(() => {
 @media (max-width: 700px) {
   .app { --pxs-label-w: 88px; }
   .app__deck {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-areas: "transport" "dial" "knobs";
     grid-template-rows: auto auto auto;
     gap: 12px;
     padding: 12px calc(16px + var(--safe-r)) calc(12px + var(--app-safe-bottom)) calc(16px + var(--safe-l));
   }
   .deck__transport { gap: 10px; flex-wrap: nowrap; }
-  .deck__play { min-width: 0; flex: 1; padding: 0 8px; }
+  .deck__play { min-width: 40px; flex: 1; padding: 0 8px; }
   .deck__thumb, .deck__town { width: 40px; flex: none; }
   .deck__town { padding: 0; }
   .deck__knobs { gap: 4px; }

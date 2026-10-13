@@ -70,8 +70,8 @@ scripts/make-icons.py      favicon, apple-touch and manifest icons (Pillow)
   listener takes over the browser the local count starts from what radio-api
   has for them on this device; minutes not yet reported are lost.
 - Compact layout (`COMPACT` in `RadioApp.client.vue`): when the window is
-  at most 500 px high, at most 340 px wide, wider than 3:1 and at most
-  700 px high, or narrower than 2:5, the layer strip, the knobs and the
+  at most 500 px high, at most 340 px wide, wider than 3:1 or narrower
+  than 2:5, the layer strip, the knobs and the
   station grid go, and the deck is one row: play, ◀ place name ▶, the
   minutes (under 480 px wide the name gets its own row). Thumbs and
   CHANNELS are not shown there; the keys still work.
