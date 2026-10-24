@@ -20,12 +20,9 @@ rises, so every per-intensity array must make musical sense on its own:
 level 0 is near-ambient, level 4 is the full band.`;
 
 /** For prompts that compose a whole landscape (not jam's parts, which the Era knob leaves alone). */
-export const ERA_NOTE = `The listener's Era knob hands the layers over to chip voices (8-bit) or to
-festival EDM (modern: supersaws, a deep sub bass, vocal chops, four-on-the-floor
-or half-time drums) by itself; compose for its middle, where the landscape plays
-as written. A place gets its character from its own parts: give the perc layer
-its own kit with \`drums.percKit\` when another kit's shakers, congas or
-tambourine suit it better than the drum kit's.`;
+export const ERA_NOTE = `The listener's Era knob hands the layers over to chip voices (8-bit) or
+acoustic instruments (analog) by itself; compose for its middle, where the
+landscape plays as written.`;
 
 function pickExamples(LANDSCAPES, base) {
   const ids = Object.keys(LANDSCAPES);

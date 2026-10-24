@@ -242,20 +242,6 @@ export function newMemory(): Memory {
  */
 export type PhraseShape = 'classic' | 'period' | 'sentence' | 'call'
 
-/**
- * How the pad plays its chords in a section (at drive and surge; below that
- * it always holds): 'pulse' re-strikes them on every eighth (the gated pad of
- * synthwave and trance), 'push' in a 3+3+2 rhythm twice a bar, 'stab' short
- * on the offbeats (house).
- */
-export type PadStyle = 'pulse' | 'push' | 'stab'
-
-/** The fill a section plays: the landscape's own, a tom run down over the last beat, or a snare roll over the second half. */
-export type FillKind = 'own' | 'toms' | 'roll'
-
-/** Where the arp leans: on the beat (default), in 3+3+2 (0, 3, 6 and 8, 11, 14), or on the offbeat eighths. */
-export type ArpAccent = 'beat' | '332' | 'off'
-
 export interface BarContext {
   L: Landscape
   key: Key
@@ -294,14 +280,6 @@ export interface BarContext {
   arpPattern?: ArpPattern
   /** The bass walks into the next bar's chord in this bar's last beat. */
   walk?: boolean
-  /** The pad's rhythm this section (from level 3; default: held). */
-  padStyle?: PadStyle
-  /** The lead's line doubled a diatonic third below, the twin lead (from level 3). */
-  harmony?: boolean
-  /** The section's fill (default: the landscape's own). */
-  fillKind?: FillKind
-  /** Where the arp's accents fall (default: on the beat). */
-  arpAccent?: ArpAccent
 }
 
 /** The voice a layer plays in this bar: the section's choice, else the landscape's own. */
@@ -332,34 +310,13 @@ export const PAN: Partial<Record<Layer, number>> = { arp: 0.28, counter: -0.3, b
 
 // ---- parts -------------------------------------------------------------------
 
-/**
- * The pad's strikes per style: [step, length in steps]. Each leaves about a
- * sixteenth of air before the next, so the rhythm is heard through the pad
- * voices' long releases.
- */
-const PAD_HITS: Record<PadStyle, Array<[number, number]>> = {
-  pulse: [0, 2, 4, 6, 8, 10, 12, 14].map(s => [s, 1.1] as [number, number]),
-  push: [[0, 2], [3, 2], [6, 1.2], [8, 2], [11, 2], [14, 1.2]],
-  stab: [[2, 1], [6, 1], [10, 1], [14, 1]],
-}
-
 function pad(ctx: BarContext, out: NoteEvent[]): void {
   const voice = voiceOf(ctx, 'pad', ctx.L.pad.voice)
   const lift = ctx.mood < 0.35 ? 2 : ctx.mood > 0.7 ? -2 : 0
-  const style = ctx.padStyle && ctx.level >= 3 ? ctx.padStyle : null
   for (const s of ctx.spans) {
     const v = voiceLead(ctx.mem.pad, s.chord, 4, 52 + lift, 76 + lift)
     ctx.mem.pad = v
-    if (!style) {
-      v.forEach((m, i) => out.push({ layer: 'pad', voice, midi: m, step: s.from, len: s.len + 0.5, vel: 0.62, pan: (i - 1.5) * 0.18 }))
-      continue
-    }
-    // A rhythm section's chords: each strike inside the span, cut at its end, a little firmer on the beat.
-    for (const [at, len] of PAD_HITS[style]) {
-      if (at < s.from || at >= s.from + s.len) continue
-      const vel = at % 4 === 0 ? 0.64 : 0.55
-      v.forEach((m, i) => out.push({ layer: 'pad', voice, midi: m, step: at, len: Math.min(len, s.from + s.len - at), vel, pan: (i - 1.5) * 0.18 }))
-    }
+    v.forEach((m, i) => out.push({ layer: 'pad', voice, midi: m, step: s.from, len: s.len + 0.5, vel: 0.62, pan: (i - 1.5) * 0.18 }))
   }
 }
 
@@ -426,9 +383,6 @@ function arpRate(ctx: BarContext): number {
   return rate
 }
 
-/** The 3+3+2 accents, twice a bar. */
-const ACCENT_332: ReadonlySet<number> = new Set([0, 3, 6, 8, 11, 14])
-
 function arp(ctx: BarContext, out: NoteEvent[]): void {
   const spec = ctx.L.arp
   if (!spec) return
@@ -470,8 +424,8 @@ function arp(ctx: BarContext, out: NoteEvent[]): void {
       }
       default: midi = tones[i % n]!
     }
-    const accent = ctx.arpAccent === '332' ? ACCENT_332.has(s) : ctx.arpAccent === 'off' ? s % 4 === 2 : s % 4 === 0
-    const vel = (accent ? 0.8 : 0.62) + ctx.rng.range(-0.05, 0.05)
+    const onBeat = s % 4 === 0
+    const vel = (onBeat ? 0.8 : 0.62) + ctx.rng.range(-0.05, 0.05)
     const cutoff = 0.35 + 0.35 * Math.sin(phase * Math.PI) + ctx.level * 0.06
     out.push({
       layer: 'arp', voice, midi, step: s, len: stride * 0.9, vel, pan: PAN.arp,
@@ -663,31 +617,6 @@ function lead(ctx: BarContext, out: NoteEvent[]): void {
   // A second instrument doubles the line an octave below, softer.
   const dbl = ctx.orch?.double
   if (dbl) for (const n of made) out.push({ ...n, voice: dbl, midi: n.midi - 12, vel: n.vel * 0.6, opts: undefined })
-  // Or the twin lead: the same line a diatonic third below, a little softer and to the side (the mono glide lead's twin is a saw).
-  else if (ctx.harmony && ctx.level >= 3) {
-    const twin = voice === 'lead.glide' ? 'lead.saw' : voice
-    for (const n of made) {
-      const h = thirdBelow(ctx, n.midi, n.step, n.len, spec.range[0] - 9)
-      if (h !== null) out.push({ ...n, voice: twin, midi: h, vel: n.vel * 0.72, pan: 0.22, opts: undefined })
-    }
-  }
-}
-
-/**
- * The note a diatonic third below `midi` (two scale steps down). On a strong
- * beat or a long note it must not clash with the chord: then the nearest
- * chord tone a third to a sixth below, or nothing. Null below `floor`.
- */
-function thirdBelow(ctx: BarContext, midi: number, step: number, len: number, floor: number): number | null {
-  const sc = scaleTonesIn(ctx.scale, midi - 12, midi)
-  const i = sc.indexOf(midi)
-  let h: number | undefined = i >= 2 ? sc[i - 2] : [...sc].reverse().find(m => midi - m >= 3)
-  const c = chordAt(ctx.spans, step)
-  if (h === undefined || ((step % 4 === 0 || len >= 4) && isAvoid(h % 12, c))) {
-    const tones = chordTonesIn(c, midi - 9, midi - 3)
-    h = tones[tones.length - 1]
-  }
-  return h !== undefined && h >= floor ? h : null
 }
 
 /**
@@ -776,7 +705,7 @@ function bells(ctx: BarContext, out: NoteEvent[]): void {
 const VEL: Record<string, number> = { X: 1, x: 0.8, g: 0.34 }
 
 function grooveEvents(g: Groove, ctx: BarContext, layer: 'drums' | 'perc', from = 0, out: DrumEvent[]): void {
-  const kit = layer === 'perc' ? ctx.L.drums.percKit ?? ctx.L.drums.kit : ctx.L.drums.kit
+  const kit = ctx.L.drums.kit
   for (const [hit, pat] of Object.entries(g)) {
     if (!pat) continue
     for (let s = from; s < 16; s++) {
@@ -796,40 +725,13 @@ function grooveEvents(g: Groove, ctx: BarContext, layer: 'drums' | 'perc', from 
   }
 }
 
-/**
- * The section's fill over a groove: the landscape's own, or the groove with
- * its last beat given to a tom run down (high, high, mid, low), or with its
- * second half given to a snare roll that swells from ghosts to an accent.
- */
-export function fillOf(kind: FillKind | undefined, own: Groove, groove: Groove): Groove {
-  if (!kind || kind === 'own') return own
-  const cut = kind === 'toms' ? 12 : 8
-  const out: Groove = {}
-  for (const [hit, row] of Object.entries(groove)) {
-    if (!row || hit === 'z') continue
-    // The kick keeps the downbeat of the roll; everything else stops where the fill starts.
-    const head = row.slice(0, cut)
-    out[hit as keyof Groove] = head + (hit === 'k' && kind === 'roll' ? 'x' : '.').padEnd(16 - cut, '.')
-  }
-  const tail = (hit: keyof Groove, rest: string) => { out[hit] = (out[hit] ?? '').slice(0, cut).padEnd(cut, '.') + rest }
-  if (kind === 'toms') {
-    tail('T', 'xx..')
-    tail('m', '..x.')
-    tail('t', '...X')
-  } else {
-    tail('s', 'gxgxxxxX')
-  }
-  return out
-}
-
 function drums(ctx: BarContext, out: DrumEvent[]): void {
   const spec = ctx.L.drums
   const emptyGroove = (g: Groove) => !Object.values(g).some(p => p && /[xXg]/.test(p))
   const lvl = levelFor(ctx, 'drums', spec.grooves, emptyGroove)
   const plvl = spec.perc ? levelFor(ctx, 'perc', spec.perc, emptyGroove) : 0
-  const fill = fillOf(ctx.fillKind, spec.fill, spec.grooves[lvl]!)
   if (ctx.present.has('drums')) {
-    const groove = ctx.fill ? fill : spec.grooves[lvl]!
+    const groove = ctx.fill ? spec.fill : spec.grooves[lvl]!
     grooveEvents(groove, ctx, 'drums', 0, out)
     if (ctx.crash) out.push({ layer: 'drums', kit: spec.kit, hit: 'x', step: 0, vel: 0.7 })
     // Busy settings add ghost hats between the written ones.
@@ -841,7 +743,7 @@ function drums(ctx: BarContext, out: DrumEvent[]): void {
       }
     }
   } else if (ctx.pickup) {
-    grooveEvents(fill, ctx, 'drums', 8, out)
+    grooveEvents(spec.fill, ctx, 'drums', 8, out)
   }
   if (ctx.present.has('perc') && spec.perc) grooveEvents(spec.perc[plvl]!, ctx, 'perc', 0, out)
 }

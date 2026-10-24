@@ -51,8 +51,8 @@ scripts/make-icons.py      favicon, apple-touch and manifest icons (Pillow)
   so far; every change goes through `useRadio().set()`, which calls
   `conductor.setControls` with only the changed fields. Controls persist in
   localStorage. There is no volume knob; the device's own volume rules.
-  Era (8-BIT ↔ MODERN) also sets the engine's `space` (`space = era`): dry
-  at 8-bit, vast at modern.
+  Era also sets the engine's `space` (`space = era`): dry at 8-bit, vast at
+  analog.
 - Keys: Space play/pause, 1–9 and 0 places, ← → previous/next place, ↑ ↓
   intensity, A auto, G glide on, D dim, C channels, + / − thumbs, Esc back
   to the town (when the visit came from it); as a guest L goes to Reader's

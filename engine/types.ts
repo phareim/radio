@@ -121,18 +121,11 @@ export type VoiceId =
   | 'chip.bass'     // NES triangle: the 4-bit stepped triangle, no envelope but the gate
   | 'chip.pad'      // a chord as a frame-rate arpeggio: each note of the chord takes its turn (`opts.chord`)
   | 'chip.bell'     // 12.5 % pulse blip with a short decay and a soft echo
-  // acoustic voices (modelled, no samples; any layer may use them)
+  // acoustic voices: the analog end of the Era knob (modelled, no samples)
   | 'strings.ensemble' // bowed string section: sustained, slow bow attack, body resonances
   | 'wind.flute'    // flute: breath chiff, soft harmonics, vibrato that comes in late
   | 'mallet.vibes'  // vibraphone: struck bar partials, long ring, slow motor tremolo
   | 'bass.upright'  // upright bass: plucked gut string, woody thump, short ring
-  // modern voices: the modern end of the Era knob, festival EDM (any layer may use them)
-  | 'lead.super'    // supersaw anthem lead: seven free-running detuned saws spread wide, an octave below for weight
-  | 'pluck.super'   // supersaw pluck: a detuned stack through a filter that snaps shut (progressive and future house)
-  | 'pad.super'     // supersaw pad: six saws a note, wide and bright, high-passed clear of the bass, made to pump
-  | 'bass.deep'     // modern sub bass: a sine sub under a saturated, filtered growl that phones can hear
-  | 'bass.808'      // 808: a long saturated sine that drops into its pitch and slides between legato notes
-  | 'vox.chop'      // vocal chop: a voice through formants, scooping into the note; short notes chop, long ones sing
 
 /** Drum kits: each maps the hit names below to a different synthesis. */
 export type KitId =
@@ -144,7 +137,6 @@ export type KitId =
   | 'kit.heartbeat' // muffled low double-thump kick, almost no highs
   | 'kit.chip'      // NES noise-channel drums
   | 'kit.acoustic'  // a real kit in a room: beater kick, wired snare, cymbals, toms
-  | 'kit.edm'       // festival: a long sub kick with a click, clap over snare, crisp hats, a crash with a sub impact
 
 /**
  * Drum hit names (one char, used in groove strings):
@@ -281,12 +273,6 @@ export interface DrumSpec {
   fill: Groove
   /** Perc-layer groove (shakers, congas) per intensity; plays on the 'perc' layer. */
   perc?: [Groove, Groove, Groove, Groove, Groove]
-  /**
-   * The perc layer's own kit (default: `kit`), so the percussion can come
-   * from another family than the drums: tribal congas and shakers over a
-   * synthwave kit, a motorik tambourine, chip blips.
-   */
-  percKit?: KitId
 }
 
 export interface FxSpec {
@@ -434,12 +420,10 @@ export interface Controls {
   /** 0 dry .. 1 vast: reverb and delay (glides). */
   space: number
   /**
-   * Era: 0 8-bit .. 0.5 the landscape as written .. 1 modern. Away from the
+   * Era: 0 8-bit .. 0.5 the landscape as written .. 1 analog. Away from the
    * middle the layers hand over, one by one at phrase starts, to chip voices
-   * (toward 0) or festival EDM (toward 1: supersaws, a deep sub, vocal chops,
-   * the drums and bass remade four on the floor or half time); the master
-   * chain crushes bits toward 0, and toward 1 drops the tape, opens the top,
-   * deepens the low end and pumps with the kick (glides).
+   * (toward 0) or acoustic instruments (toward 1); the master chain crushes
+   * bits toward 0 and adds tape toward 1 (glides).
    */
   era: number
   /** 0 sparse .. 1 busy: note density, arp rate, ghost notes (phrase boundaries). */
@@ -508,14 +492,6 @@ export interface FxState {
   pump: number
   /** Stereo width 0..1. */
   width: number
-  /**
-   * Sidechain 0..1 (the modern side of Era): how deep each kick ducks the
-   * bass and every melodic layer, pads and drones deepest, so the mix
-   * breathes with the beat. Missing = 0.
-   */
-  sidechain?: number
-  /** Low end 0..1 (the modern side of Era): a master low shelf, up to +2 dB under 90 Hz. Missing = 0. */
-  low?: number
 }
 
 /** A chord span inside one bar. */

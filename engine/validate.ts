@@ -132,7 +132,6 @@ export function validateLandscape(input: unknown): Validation {
       if (!Array.isArray(L.drums.perc) || L.drums.perc.length !== 5) err('drums.perc: five grooves')
       else L.drums.perc.forEach((g, i) => groove(g, `drums.perc[${i}]`))
     }
-    if (L.drums.percKit !== undefined && !KIT_IDS.includes(L.drums.percKit)) err(`drums.percKit: one of ${KIT_IDS.join('|')} (the perc layer's kit; leave it out to use drums.kit)`)
   }
 
   if (!Array.isArray(L.layers) || L.layers.length !== 5) err('layers: five lists (intensity 0..4)')

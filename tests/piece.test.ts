@@ -342,8 +342,7 @@ test('growing is deterministic and sounds like the landscape over the piece chor
   const b = growLadder(p, { lookup, seed: 7 })
   assert.deepEqual(a, b)
   assert.notDeepEqual(growLadder(p, { lookup, seed: 8 }), a)
-  assert.deepEqual(a.map(t => [t.layer, t.enter]), [['pad', 0], ['bass', 1], ['arp', 1], ['drums', 2], ['perc', 3], ['lead', 3], ['counter', 4]])
-  assert.equal(a.find(t => t.layer === 'perc')!.kit, LANDSCAPES.nightdrive!.drums.percKit, 'the perc track keeps its own kit')
+  assert.deepEqual(a.map(t => [t.layer, t.enter]), [['pad', 0], ['bass', 1], ['arp', 1], ['drums', 2], ['lead', 3], ['counter', 4]])
   const grown = { ...p, tracks: a }
   assert.deepEqual(validatePiece(grown).errors, [])
   const bass = a.find(t => t.layer === 'bass')!
@@ -358,7 +357,7 @@ test('growing is deterministic and sounds like the landscape over the piece chor
   // Growing again skips covered layers; growLayer borrows another landscape's part.
   assert.deepEqual(growLadder(grown, { lookup }), [])
   const perc = growLayer(grown, 'perc', 2, { lookup, from: 'jungle' })
-  assert.equal(perc.id, 'perc-2', 'night drive grew its tambourine as perc already')
+  assert.equal(perc.id, 'perc')
   assert.equal(perc.kit, 'kit.tribal')
   assert.equal(perc.bars[0], formatDrumBar(LANDSCAPES.jungle!.drums.perc![2]))
   const bass2 = growLayer(grown, 'bass', 3, { lookup, from: 'coast', enter: 1 })
