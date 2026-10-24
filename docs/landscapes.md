@@ -5,23 +5,18 @@ lives in `engine/landscapes/<id>.ts`; the scene in `scene/scenes/<id>.ts`.
 
 | id | Name | Scene | Sound |
 |---|---|---|---|
-| `coast` | Neon Coast | Neon Shrine's home: dusk over the sea, the striped sun on the horizon, palm silhouettes, a pier with lamps, slow waves | D mixolydian → dorian → aeolian, 108 bpm. Square lead, saw pad, pluck arp, synthwave drums; a tribal shaker and congas from drive, small chimes at surge. Waves and gulls |
-| `summit` | Mountain Top | above the clouds: violet peaks with snow catching pink light, a sea of cloud below, a cairn and a prayer-flag line, first stars | D lydian → ionian, 84 bpm. Choir pad, hollow flute lead, glass arp, half-time toms when it builds, a tambourine's shimmer at surge. High wind |
+| `coast` | Neon Coast | Neon Shrine's home: dusk over the sea, the striped sun on the horizon, palm silhouettes, a pier with lamps, slow waves | D mixolydian → dorian → aeolian, 108 bpm. Square lead, saw pad, pluck arp, synthwave drums. Waves and gulls |
+| `summit` | Mountain Top | above the clouds: violet peaks with snow catching pink light, a sea of cloud below, a cairn and a prayer-flag line, first stars | D lydian → ionian, 84 bpm. Choir pad, hollow flute lead, glass arp, half-time toms when it builds. High wind |
 | `jungle` | Jungle | dense teal canopy, hanging vines, a waterfall into a pool, a mossy ruin, fireflies | A dorian, 104 bpm with swing. Marimba and kalimba, whistle lead, tribal kit with congas and shaker. Jungle birds, insects, stream |
-| `frostwood` | Frostwood | deep cold forest: dark snowy pines, a pale moon, falling snow, low fog, a faint green-violet aurora | E aeolian → phrygian, 72 bpm. Dark pad with tape wow, hollow lead, sparse glass bells, heartbeat kick, a soft shaker at surge. Owl, snow hush, wind |
-| `village` | Village | a small village at dusk: houses with lit windows, chimney smoke, lanterns on a string, a well, a church tower | F ionian → mixolydian with maj7s, 96 bpm, lazy swing. Electric piano, warm arp, brushed drums; a woodblock and congas from drive. Chimes, birds, a far bell, fire |
-| `nightdrive` | Night Drive | the car trip: a coastal highway at night seen from the side, streetlights sweeping past, the city skyline ahead, the moon | A aeolian, 112 bpm. Synthwave: pluck bass 8ths, glide lead, gated snare, pumping pads, a tambourine on the backbeat from drive. Road hum, passing cars |
-| `voyager` | Voyager | space exploration: through a ship's window, a ringed planet, nebulae, drifting asteroids, a moving starfield | C lydian, 118 bpm. Berlin-school sequencer arp, FM bells, motorik drums, chip-blip telemetry from drive. Radio blips, shimmer |
+| `frostwood` | Frostwood | deep cold forest: dark snowy pines, a pale moon, falling snow, low fog, a faint green-violet aurora | E aeolian → phrygian, 72 bpm. Dark pad with tape wow, hollow lead, sparse glass bells, heartbeat kick. Owl, snow hush, wind |
+| `village` | Village | a small village at dusk: houses with lit windows, chimney smoke, lanterns on a string, a well, a church tower | F ionian → mixolydian with maj7s, 96 bpm, lazy swing. Electric piano, warm arp, brushed drums. Chimes, birds, a far bell, fire |
+| `nightdrive` | Night Drive | the car trip: a coastal highway at night seen from the side, streetlights sweeping past, the city skyline ahead, the moon | A aeolian, 112 bpm. Synthwave: pluck bass 8ths, glide lead, gated snare, pumping pads. Road hum, passing cars |
+| `voyager` | Voyager | space exploration: through a ship's window, a ringed planet, nebulae, drifting asteroids, a moving starfield | C lydian, 118 bpm. Berlin-school sequencer arp, FM bells, motorik drums. Radio blips, shimmer |
 | `deepspace` | Deep Space | deep space quiet: near-black, very sparse stars, a distant galaxy smudge, slow drift | Bb lydian → aeolian, 60 bpm, a chord every 4 bars. Shimmer drone, glass pad, rare glass bells, no beat until the very top. Space hum |
-| `neonrain` | Neon Rain | a rainy city street at night: neon signs, reflections in puddles, rain streaks, a lit noodle bar | G dorian with m9s, 84 bpm, swung. Lofi: electric piano, soft kit, round bass, a shaker from drive, glass drops at surge. Rain, city hum |
-| `caverns` | Crystal Caverns | under the shrine: a cave with glowing crystals, dripping water, an underground lake reflecting the glow | D harmonic minor → phrygian, 90 bpm. Pulse lead, harp plucks, chip drums, dark pad, an echoing woodblock like drips from drive. Drips (stream), shimmer |
+| `neonrain` | Neon Rain | a rainy city street at night: neon signs, reflections in puddles, rain streaks, a lit noodle bar | G dorian with m9s, 84 bpm, swung. Lofi: electric piano, soft kit, round bass. Rain, city hum |
+| `caverns` | Crystal Caverns | under the shrine: a cave with glowing crystals, dripping water, an underground lake reflecting the glow | D harmonic minor → phrygian, 90 bpm. Pulse lead, harp plucks, chip drums, dark pad. Drips (stream), shimmer |
 
 Intensity names, 0–4: STILL, DRIFT, CRUISE, DRIVE, SURGE.
-
-Each has a few progressions (a contrast and often a bridge among them), four
-or so written themes and other instruments for its contrast sections
-(`alt`). `drums.percKit` gives the perc layer a kit of its own, so the
-percussion can come from another family than the drums.
 
 ## Scenes for composed channels
 

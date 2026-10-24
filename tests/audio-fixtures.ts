@@ -61,7 +61,6 @@ function fake(bar: (i: number) => Bar): ConductorLike {
 const ROLE: Partial<Record<VoiceId, string>> = {
   'chip.lead': 'lead', 'chip.bass': 'bass', 'chip.pad': 'pad', 'chip.bell': 'bell',
   'strings.ensemble': 'pad', 'wind.flute': 'lead',
-  'pluck.super': 'arp', 'vox.chop': 'lead',
 }
 
 export function layerOf(v: VoiceId): Layer {

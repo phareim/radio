@@ -103,7 +103,7 @@ function landscapeOf(id: string): Landscape {
 }
 
 function set(patch: Partial<Controls>): void {
-  // Era carries Space: dry at 8-bit, vast at modern (festival reverbs; the kick and the sub stay dry).
+  // Era carries Space: dry at 8-bit, vast at analog.
   if (patch.era !== undefined) patch = { ...patch, space: patch.era }
   const clean: Partial<Controls> = {}
   for (const [k, v] of Object.entries(patch) as Array<[keyof Controls, never]>) {

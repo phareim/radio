@@ -2,33 +2,20 @@
  * The Era palette: which voice and kit a layer plays at a given Era.
  *
  * Era 0.5 is the landscape as written. Away from the middle the layers hand
- * over one by one: toward 0 (8-bit) to chip voices, soft beds first and the
- * lead last; toward 1 (modern) to festival EDM, the beat and the bass first
- * (a kick on every beat and a deep sub are most of what makes it sound now),
- * then the beds, the arp and the bells, the counter line, the lead last. The
- * conductor maps each bar after composing it (at the modern end modern.ts
- * remakes its drums and bass first), so the composer, the written quotes and
- * the orchestration never need to know.
+ * over one by one, soft beds first and the lead last, to chip voices (toward
+ * 0, 8-bit) or acoustic instruments (toward 1, analog). The conductor maps
+ * each bar after composing it, so the composer, the written quotes and the
+ * orchestration never need to know.
  */
 import type { DrumEvent, KitId, Layer, NoteEvent, VoiceId } from './types.ts'
 
 /**
- * How far toward 8-bit (0..1) the knob must be before a layer hands over.
- * Beds and drums go first, so the colour shifts before the tune does; the
- * lead goes last. Every layer has handed over at era 0.
+ * How far from the middle (0..1) the knob must be before a layer hands
+ * over. Beds and drums go first, so the colour shifts before the tune does;
+ * the lead goes last. Every layer has handed over at era 0 and 1.
  */
 export const HANDOVER: Record<Layer, number> = {
   drone: 0.2, pad: 0.2, drums: 0.35, perc: 0.35, bells: 0.45, arp: 0.55, bass: 0.65, counter: 0.75, lead: 0.85,
-  ambience: 1,
-}
-
-/**
- * The same toward modern: the drums and the bass on the first step past the
- * middle, then the beds and the perc, the arp and the bells, the counter, the
- * lead. Every layer has handed over at era 1.
- */
-export const MODERN_HANDOVER: Record<Layer, number> = {
-  drums: 0.2, bass: 0.2, drone: 0.35, pad: 0.35, perc: 0.35, arp: 0.55, bells: 0.55, counter: 0.75, lead: 0.85,
   ambience: 1,
 }
 
@@ -41,16 +28,14 @@ export const CHIP: Record<VoiceId, VoiceId> = {
   'keys.piano': 'chip.lead', 'keys.felt': 'chip.lead',
   'guitar.nylon': 'chip.lead', 'guitar.steel': 'chip.lead', 'guitar.mute': 'chip.lead',
   'wind.flute': 'chip.lead', 'mallet.vibes': 'chip.lead',
-  'lead.super': 'chip.lead', 'pluck.super': 'chip.lead', 'vox.chop': 'chip.lead',
   // Arps: the chip arp.
   'arp.square': 'arp.square', 'arp.pluck': 'arp.square', 'arp.warm': 'arp.square', 'arp.glass': 'arp.square', 'arp.seq': 'arp.square',
   // Pads: the chord as a frame-rate arpeggio.
   'pad.saw': 'chip.pad', 'pad.strings': 'chip.pad', 'pad.choir': 'chip.pad', 'pad.glass': 'chip.pad',
-  'pad.warm': 'chip.pad', 'pad.dark': 'chip.pad', 'strings.ensemble': 'chip.pad', 'pad.super': 'chip.pad',
+  'pad.warm': 'chip.pad', 'pad.dark': 'chip.pad', 'strings.ensemble': 'chip.pad',
   // Basses and drones: the triangle channel.
   'bass.saw': 'chip.bass', 'bass.square': 'chip.bass', 'bass.round': 'chip.bass', 'bass.sub': 'chip.bass',
   'bass.pluck': 'chip.bass', 'bass.fm': 'chip.bass', 'bass.finger': 'chip.bass', 'bass.upright': 'chip.bass',
-  'bass.deep': 'chip.bass', 'bass.808': 'chip.bass',
   'drone.sub': 'chip.bass', 'drone.organ': 'chip.bass', 'drone.shimmer': 'chip.bass',
   // Bells: the thin pulse blip.
   'bell.glass': 'chip.bell', 'bell.fm': 'chip.bell', 'bell.chime': 'chip.bell',
@@ -59,46 +44,46 @@ export const CHIP: Record<VoiceId, VoiceId> = {
   'chip.lead': 'chip.lead', 'chip.bass': 'chip.bass', 'chip.pad': 'chip.pad', 'chip.bell': 'chip.bell',
 }
 
-/** The modern counterpart of every voice (modernOn refines it by layer). Modern voices keep themselves. */
-export const MODERN: Record<VoiceId, VoiceId> = {
-  // Synth leads become the supersaw anthem lead; the airy ones a vocal.
-  'lead.square': 'lead.super', 'lead.saw': 'lead.super', 'lead.pulse': 'lead.super', 'lead.fm': 'lead.super',
-  'lead.glide': 'lead.super', 'chip.lead': 'lead.super',
-  'lead.hollow': 'vox.chop', 'lead.whistle': 'vox.chop', 'wind.flute': 'vox.chop',
-  // Keys, mallets, plucked strings and arps: the supersaw pluck.
-  'lead.ep': 'pluck.super', 'keys.piano': 'pluck.super', 'keys.felt': 'pluck.super',
-  'mallet.kalimba': 'pluck.super', 'mallet.marimba': 'pluck.super', 'mallet.vibes': 'pluck.super', 'pluck.harp': 'pluck.super',
-  'guitar.nylon': 'pluck.super', 'guitar.steel': 'pluck.super', 'guitar.mute': 'pluck.super',
-  'arp.square': 'pluck.super', 'arp.pluck': 'pluck.super', 'arp.warm': 'pluck.super', 'arp.glass': 'pluck.super', 'arp.seq': 'pluck.super',
-  // Pads and bowed strings: the supersaw pad.
-  'pad.saw': 'pad.super', 'pad.strings': 'pad.super', 'pad.choir': 'pad.super', 'pad.glass': 'pad.super',
-  'pad.warm': 'pad.super', 'pad.dark': 'pad.super', 'strings.ensemble': 'pad.super', 'chip.pad': 'pad.super',
-  // Basses: the deep sub (modern.ts gives the half-time grooves the 808).
-  'bass.saw': 'bass.deep', 'bass.square': 'bass.deep', 'bass.round': 'bass.deep', 'bass.sub': 'bass.deep',
-  'bass.pluck': 'bass.deep', 'bass.fm': 'bass.deep', 'bass.finger': 'bass.deep', 'bass.upright': 'bass.deep',
-  'chip.bass': 'bass.deep',
-  // Bells: vocal chops, sprinkled high.
-  'bell.glass': 'vox.chop', 'bell.fm': 'vox.chop', 'bell.chime': 'vox.chop', 'chip.bell': 'vox.chop',
-  // Counter lines: the soft one sings; the string line becomes one wide supersaw line.
-  'counter.soft': 'vox.chop', 'counter.strings': 'pad.super',
-  // Drones: the sub holds (the sidechain makes it breathe); the shimmer becomes a high supersaw.
-  'drone.sub': 'drone.sub', 'drone.organ': 'drone.sub', 'drone.shimmer': 'pad.super',
-  'lead.super': 'lead.super', 'pluck.super': 'pluck.super', 'pad.super': 'pad.super',
-  'bass.deep': 'bass.deep', 'bass.808': 'bass.808', 'vox.chop': 'vox.chop',
+/** The acoustic counterpart of every voice. Played and acoustic instruments keep themselves. */
+export const ANALOG: Record<VoiceId, VoiceId> = {
+  // Leads: the instrument each synth lead imitates or recalls.
+  'lead.square': 'keys.piano', 'lead.saw': 'guitar.steel', 'lead.pulse': 'mallet.marimba', 'lead.ep': 'keys.piano',
+  'lead.hollow': 'wind.flute', 'lead.fm': 'mallet.vibes', 'lead.glide': 'wind.flute', 'lead.whistle': 'wind.flute',
+  // Mallets, harp, keys, guitars and the acoustic voices are acoustic already.
+  'mallet.kalimba': 'mallet.kalimba', 'mallet.marimba': 'mallet.marimba', 'pluck.harp': 'pluck.harp',
+  'keys.piano': 'keys.piano', 'keys.felt': 'keys.felt',
+  'guitar.nylon': 'guitar.nylon', 'guitar.steel': 'guitar.steel', 'guitar.mute': 'guitar.mute',
+  'wind.flute': 'wind.flute', 'mallet.vibes': 'mallet.vibes', 'strings.ensemble': 'strings.ensemble',
+  // Arps: picked guitar for the soft ones, muted guitar for the sequencer ones, harp for the glassy one.
+  'arp.square': 'guitar.nylon', 'arp.warm': 'guitar.nylon', 'arp.pluck': 'guitar.mute', 'arp.seq': 'guitar.mute',
+  'arp.glass': 'pluck.harp',
+  // Pads: a bowed string section; the choir is voices already.
+  'pad.saw': 'strings.ensemble', 'pad.strings': 'strings.ensemble', 'pad.choir': 'pad.choir', 'pad.glass': 'strings.ensemble',
+  'pad.warm': 'strings.ensemble', 'pad.dark': 'strings.ensemble',
+  // Basses: fingered for the driving ones, upright for the round and sub ones.
+  'bass.saw': 'bass.finger', 'bass.square': 'bass.finger', 'bass.pluck': 'bass.finger', 'bass.fm': 'bass.finger',
+  'bass.round': 'bass.upright', 'bass.sub': 'bass.upright', 'bass.finger': 'bass.finger', 'bass.upright': 'bass.upright',
+  // Bells: vibraphone, and the kalimba for the small chime.
+  'bell.glass': 'mallet.vibes', 'bell.fm': 'mallet.vibes', 'bell.chime': 'mallet.kalimba',
+  // Counter lines: strings.
+  'counter.strings': 'strings.ensemble', 'counter.soft': 'strings.ensemble',
+  // Drones: the organ holds; the shimmer becomes high strings.
+  'drone.sub': 'drone.organ', 'drone.organ': 'drone.organ', 'drone.shimmer': 'strings.ensemble',
+  // Chip voices (a landscape may use them): their nearest acoustic kin.
+  'chip.lead': 'keys.piano', 'chip.bass': 'bass.upright', 'chip.pad': 'strings.ensemble', 'chip.bell': 'mallet.vibes',
 }
 
 /** Kits: the NES noise channel toward 8-bit. */
 export const CHIP_KITS: Record<KitId, KitId> = {
   'kit.synthwave': 'kit.chip', 'kit.soft': 'kit.chip', 'kit.tribal': 'kit.chip', 'kit.brush': 'kit.chip',
   'kit.motorik': 'kit.chip', 'kit.heartbeat': 'kit.chip', 'kit.chip': 'kit.chip', 'kit.acoustic': 'kit.chip',
-  'kit.edm': 'kit.chip',
 }
 
-/** Kits: the festival kit toward modern. */
-export const MODERN_KITS: Record<KitId, KitId> = {
-  'kit.synthwave': 'kit.edm', 'kit.soft': 'kit.edm', 'kit.tribal': 'kit.edm', 'kit.brush': 'kit.edm',
-  'kit.motorik': 'kit.edm', 'kit.heartbeat': 'kit.edm', 'kit.chip': 'kit.edm', 'kit.acoustic': 'kit.edm',
-  'kit.edm': 'kit.edm',
+/** Kits: a real kit in a room toward analog; brushes and hand drums are real already. */
+export const ANALOG_KITS: Record<KitId, KitId> = {
+  'kit.synthwave': 'kit.acoustic', 'kit.soft': 'kit.acoustic', 'kit.motorik': 'kit.acoustic',
+  'kit.heartbeat': 'kit.acoustic', 'kit.chip': 'kit.acoustic',
+  'kit.brush': 'kit.brush', 'kit.tribal': 'kit.tribal', 'kit.acoustic': 'kit.acoustic',
 }
 
 /**
@@ -110,44 +95,21 @@ const CHIP_LAYER: Partial<Record<Layer, VoiceId>> = {
   arp: 'arp.square', counter: 'lead.pulse', pad: 'chip.pad', bass: 'chip.bass', bells: 'chip.bell',
 }
 
-/**
- * Toward modern some layers want one sound whatever they played: the arp the
- * supersaw pluck, the pad the supersaw pad, the bells vocal chops, the bass
- * the deep sub (or the 808 it already is). A counter line never takes the
- * anthem lead or a bass (it sings), and the lead never a pad, a drone or a bass.
- */
-function modernOn(layer: Layer, v: VoiceId): VoiceId {
-  switch (layer) {
-    case 'arp': return 'pluck.super'
-    case 'pad': return 'pad.super'
-    case 'bells': return 'vox.chop'
-    case 'bass': return v === 'bass.808' ? v : 'bass.deep'
-    case 'counter': return v === 'lead.super' || v === 'bass.deep' || v === 'bass.808' || v === 'drone.sub' ? 'vox.chop' : v
-    case 'lead': return v === 'pad.super' || v === 'bass.deep' || v === 'bass.808' || v === 'drone.sub' ? 'lead.super' : v
-    default: return v
-  }
-}
-
 /** 0 at the middle of the knob, 1 at either end. */
 export function eraDistance(era: number): number {
   return Math.min(1, Math.abs(era - 0.5) * 2)
 }
 
-/** How far toward modern (0 at and below the middle, 1 at the top). */
-export function modernAmount(era: number): number {
-  return Math.max(0, Math.min(1, (era - 0.5) * 2))
-}
-
 /** Whether `layer` has handed over at this era (never at 0.5). */
 export function handedOver(layer: Layer, era: number): boolean {
   const d = eraDistance(era)
-  return d > 0 && d + 1e-9 >= (era > 0.5 ? MODERN_HANDOVER : HANDOVER)[layer]
+  return d > 0 && d + 1e-9 >= HANDOVER[layer]
 }
 
 /** The voice `layer` plays at `era` in place of `voice`. */
 export function eraVoice(voice: VoiceId, layer: Layer, era: number): VoiceId {
   if (!handedOver(layer, era)) return voice
-  if (era > 0.5) return modernOn(layer, MODERN[voice])
+  if (era > 0.5) return ANALOG[voice]
   const v = CHIP[voice]
   return v === 'chip.lead' ? CHIP_LAYER[layer] ?? v : v
 }
@@ -155,7 +117,7 @@ export function eraVoice(voice: VoiceId, layer: Layer, era: number): VoiceId {
 /** The kit `layer` plays at `era` in place of `kit`. */
 export function eraKit(kit: KitId, layer: Layer, era: number): KitId {
   if (!handedOver(layer, era)) return kit
-  return era > 0.5 ? MODERN_KITS[kit] : CHIP_KITS[kit]
+  return era > 0.5 ? ANALOG_KITS[kit] : CHIP_KITS[kit]
 }
 
 /**

@@ -13,7 +13,6 @@ export const neonrain: Landscape = {
   progressions: [
     { chords: '1 4', barsPerChord: 2, role: 'a', weight: 2 },
     { chords: '1 7 3 4', role: 'a' },
-    { chords: '1 5 4 4', role: 'a' },
     { chords: '4 3 2 1', role: 'b' },
     { chords: '2 5 1:2', role: 'b' },
   ],
@@ -31,11 +30,9 @@ export const neonrain: Landscape = {
       '. 3 5 7 - 5 3 . | 4 - - 3 - . . .',
       '5 - 4 3 - 1 . . | 2 - 3 - - - . .',
       '1 - 3 - 5 - 7 6 | 5 - - - . . . .',
-      ". 5 7 1' - 7 5 . | 4 - 3 - . . . .",
     ],
   },
   counter: { voice: 'counter.soft', style: 'answer' },
-  bells: { voice: 'bell.glass', density: 0.12 },
   drums: {
     kit: 'kit.soft',
     grooves: [
@@ -46,16 +43,13 @@ export const neonrain: Landscape = {
       { k: 'x..x....x.x..x..', s: '....x..g....x..g', h: 'xgxgxgxgxgxgxgxg', p: '...x.......x....' },
     ],
     fill: { k: 'x.........x.....', s: '....x......gx.gx', h: 'x.x.x.x.x.......' },
-    // A shaker on the offbeats, a longer shake on the backbeat at surge.
-    percKit: 'kit.tribal',
-    perc: [{}, {}, {}, { h: '..x...x...x...x.' }, { h: '..x...x...x...x.', o: '....g.......g...' }],
   },
   layers: [
     ['ambience', 'pad'],
     ['ambience', 'pad', 'arp'],
     ['ambience', 'pad', 'arp', 'bass', 'drums'],
-    ['ambience', 'pad', 'arp', 'bass', 'perc', 'drums', 'lead'],
-    ['ambience', 'pad', 'arp', 'bass', 'perc', 'drums', 'lead', 'counter', 'bells'],
+    ['ambience', 'pad', 'arp', 'bass', 'drums', 'lead'],
+    ['ambience', 'pad', 'arp', 'bass', 'drums', 'lead', 'counter'],
   ],
   fx: { reverb: 0.35, delay: 0.3, reverbSize: 2.2, tone: 0.6, grit: 0.55 },
   ambience: { rain: 0.5, city: 0.25 },

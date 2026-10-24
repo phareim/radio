@@ -1,7 +1,7 @@
 /**
  * The master chain and the shared effects.
  *
- *   input ─ HP 24 Hz ─ low shelf ─ tone LP ─ crush (dry + staircase wet) ─ tape (drive → shaper → makeup) ─ wow ─ width ─ glue comp ─ trim ─ limiter ─ soft clip ─ output
+ *   input ─ HP 24 Hz ─ tone LP ─ crush (dry + staircase wet) ─ tape (drive → shaper → makeup) ─ wow ─ width ─ glue comp ─ trim ─ limiter ─ soft clip ─ output
  *                                                                └ hiss (grit)
  *   reverbIn ─ HP/LP ─ convolver A/B (crossfaded on size changes) ─┐
  *   gatedIn ─ gated convolver ──────────────────────────────────────┼─ input
@@ -124,9 +124,6 @@ export function crushCurve(bits: number) {
   return c
 }
 
-/** The low shelf's lift at full `fx.low` (the modern end of Era), in dB. */
-export const LOW_SHELF_DB = 2
-
 /** The wet share of the crushed path at full crush: a console's grain over the mix, never a broken one. */
 export const CRUSH_WET = 0.45
 
@@ -157,9 +154,6 @@ export function createFx(ac: BaseAudioContext): Fx {
 
   const input = g(1)
   const hp = f('highpass', 24, 0.6)
-  // The modern end's low end: a shelf under 90 Hz, flat until fx.low lifts it.
-  const low = f('lowshelf', 90)
-  low.gain.value = 0
   const tone = f('lowpass', 16000, 0.5)
   // Crush: a parallel path through two staircases, the finer one fading into
   // the coarser as crush rises. No oversampling: the aliasing is the sound. A
@@ -240,8 +234,7 @@ export function createFx(ac: BaseAudioContext): Fx {
   const output = g(1)
 
   input.connect(hp)
-  hp.connect(low)
-  low.connect(tone)
+  hp.connect(tone)
   tone.connect(crushDry)
   tone.connect(crushIn)
   crushDry.connect(tapeIn)
@@ -322,7 +315,7 @@ export function createFx(ac: BaseAudioContext): Fx {
   /** When the last reverb crossfade ends. */
   let xfadeEnd = -1
   const params: AudioParam[] = [
-    tone.frequency, low.gain, crushDry.gain, crushWet.gain, fineG.gain, coarseG.gain, drive.gain, makeup.gain, wowDepth.gain, flutDepth.gain, hiss.gain,
+    tone.frequency, crushDry.gain, crushWet.gain, fineG.gain, coarseG.gain, drive.gain, makeup.gain, wowDepth.gain, flutDepth.gain, hiss.gain,
     ll.gain, rr.gain, lr.gain, rl.gain, reverbIn.gain, delayIn.gain, dl.delayTime, dr.delayTime,
   ]
 
@@ -351,7 +344,6 @@ export function createFx(ac: BaseAudioContext): Fx {
     const grit = clamp(s.grit ?? 0, 0, 1)
     const toneHz = 1000 * Math.pow(18, clamp(s.tone ?? 0.8, 0, 1)) * (1 - 0.3 * grit)
     set(tone.frequency, Math.min(toneHz, ac.sampleRate * 0.45))
-    set(low.gain, LOW_SHELF_DB * clamp(s.low ?? 0, 0, 1))
     // Crush: the wet path takes up to CRUSH_WET of the mix; dry + wet stays at unity.
     const crush = clamp(s.crush ?? 0, 0, 1)
     set(crushWet.gain, CRUSH_WET * crush)
