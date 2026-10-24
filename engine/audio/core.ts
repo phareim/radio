@@ -13,6 +13,14 @@
  *                                         └─ delay send  ─ fx.delayIn
  *   drums/perc also: gate fader ─ fx.gatedIn
  *
+ * The pump is every pitched layer's ducker: each kick pulls pads and drones
+ * down by `fx.pump` (the synthwave pump) and, toward the modern end of Era,
+ * every pitched layer by `fx.sidechain` (SIDECHAIN: the bass and the beds
+ * deepest, the lead least), so the band breathes with the beat. A ducked
+ * layer swells back a little past unity (as a producer pushes a sidechained
+ * part), so it loses no loudness to the ducking; with the sidechain off it
+ * settles back at unity.
+ *
  * Fades are scheduled one linear ramp per bar (see timing.ts `Fade`), so no
  * automation that is already sounding ever has to be cancelled.
  *
@@ -55,6 +63,9 @@ const SENDS: Record<Layer, [number, number]> = {
 
 /** Default stereo placement when a note has no pan of its own. */
 const DEFAULT_PAN: Partial<Record<Layer, number>> = { arp: 0.22, counter: -0.26 }
+
+/** How deep a full sidechain ducks each pitched layer on a kick (the modern end of Era). */
+const SIDECHAIN: Partial<Record<Layer, number>> = { bass: 0.8, pad: 0.85, drone: 0.85, arp: 0.6, counter: 0.6, bells: 0.5, lead: 0.35 }
 
 /** Layers whose repeated notes are tied instead of re-attacked. */
 const TIE: Partial<Record<Layer, boolean>> = { pad: true, drone: true }
@@ -132,7 +143,7 @@ export function createCore(ac: BaseAudioContext, conductor: ConductorLike): Core
     fader.gain.value = 0
     let post: AudioNode = fader
     let pump: GainNode | null = null
-    if (layer === 'pad' || layer === 'drone') {
+    if (layer === 'pad' || layer === 'drone' || SIDECHAIN[layer]) {
       pump = ac.createGain()
       fader.connect(pump)
       post = pump
@@ -170,6 +181,7 @@ export function createCore(ac: BaseAudioContext, conductor: ConductorLike): Core
   /** The idle transport has faded the ambience out (reset when a bar is planned or cut). */
   let idle = false
   let pumpDepth = 0
+  let sidechain = 0
   let beatLen = 0.5
 
   // ---- scheduling ---------------------------------------------------------------------
@@ -212,7 +224,7 @@ export function createCore(ac: BaseAudioContext, conductor: ConductorLike): Core
     }
     const h = playVoice(b.vc, e.voice, e.midi, t, dur, e.vel, e.opts, pan)
     if (h) scheduled.push(h)
-    if (e.voice === 'lead.glide') b.glide = b.vc.glide
+    if (e.voice === 'lead.glide' || e.voice === 'bass.808') b.glide = b.vc.glide
   }
 
   /** A drum hit; scheduled ones (not `live`) are kept for a cut. */
@@ -225,15 +237,23 @@ export function createCore(ac: BaseAudioContext, conductor: ConductorLike): Core
       let i = kicks.length
       while (i > 0 && kicks[i - 1]! > t) i--
       kicks.splice(i, 0, t)
-      // The pump: duck pads and drones on the kick, recover over about a quarter of a beat.
+      // The swell past unity makes up for the dip over the time between kicks (a beat on four on the floor).
+      const gap = clamp(i > 0 ? t - kicks[i - 1]! : beatLen, beatLen * 0.5, beatLen * 2.5)
+      // The pump: duck pads and drones on the kick, recover over about a quarter of a beat. The sidechain
+      // ducks every pitched layer and lets it swell back over most of the beat (the bass sooner, for the
+      // offbeat); where both act, the deeper wins.
       const drumsLevel = b.ramp[3]
-      const depth = clamp(pumpDepth * drumsLevel, 0, 1) * 0.6
-      if (depth > 0.01) {
-        for (const l of ['pad', 'drone'] as const) {
-          const p = buses[l].pump!.gain
-          p.setTargetAtTime(1 - depth, t, 0.006)
-          p.setTargetAtTime(1, t + 0.04, beatLen * 0.22)
-        }
+      for (const l of LAYERS) {
+        const p = buses[l].pump?.gain
+        if (!p) continue
+        const pump = l === 'pad' || l === 'drone' ? clamp(pumpDepth, 0, 1) * 0.6 : 0
+        const sc = clamp(sidechain, 0, 1) * (SIDECHAIN[l] ?? 0)
+        const depth = clamp(Math.max(pump, sc) * drumsLevel, 0, 0.9)
+        if (depth <= 0.01) continue
+        const breathe = sc > pump
+        const tau = beatLen * (!breathe ? 0.22 : l === 'bass' ? 0.12 : 0.3)
+        p.setTargetAtTime(1 - depth, t, breathe ? 0.004 : 0.006)
+        p.setTargetAtTime(breathe ? 1 + (depth * (0.03 + tau)) / gap : 1, t + (breathe ? 0.03 : 0.04), tau)
       }
     }
   }
@@ -245,6 +265,9 @@ export function createCore(ac: BaseAudioContext, conductor: ConductorLike): Core
     beatLen = 60 / Math.max(20, bpm || 100)
     res.grit = clamp(plan.fx?.grit ?? 0, 0, 1)
     pumpDepth = clamp(plan.fx?.pump ?? 0, 0, 1)
+    sidechain = clamp(plan.fx?.sidechain ?? 0, 0, 1)
+    // Without the sidechain, a layer it left swelled past unity settles back (a kick later in the bar still ducks).
+    if (sidechain === 0) for (const l of LAYERS) buses[l].pump?.gain.setTargetAtTime(1, t0, 0.08)
     if (plan.fx) fx.apply(plan.fx, t0, tm.dur, bpm)
     scheduleMix(plan, t0, t1)
     ambience.bar(plan, t0, t1)

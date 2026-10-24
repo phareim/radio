@@ -15,6 +15,7 @@ export const jungle: Landscape = {
     { chords: '1 7 4 1', role: 'a' },
     { chords: '3 4 5 1', role: 'b' },
     { chords: '4:2 5 7', role: 'b' },
+    { chords: '7 4 1:2', role: 'bridge' },
   ],
   color: 0.35,
   pad: { voice: 'pad.warm' },
@@ -30,6 +31,7 @@ export const jungle: Landscape = {
       "5 . 5 6 . 1' 6 5 | 3 - . 5 - . . .",
       "1' 7 5 . 6 5 3 . | 5 - - - . . . .",
       '. 3 5 . 6 - 5 3 | 1 - 3 - 2 - . .',
+      "5 6 5 3 . 5 6 1' | 6 - 5 - . . . .",
     ],
   },
   counter: { voice: 'mallet.kalimba', style: 'answer' },
@@ -61,5 +63,8 @@ export const jungle: Landscape = {
   fx: { reverb: 0.3, delay: 0.25, reverbSize: 2.2, tone: 0.85, grit: 0.2 },
   ambience: { 'birds.jungle': 0.45, insects: 0.35, stream: 0.25 },
   accent: '#3fe0a0',
-  alt: { lead: ['mallet.marimba', 'guitar.nylon'], arp: ['guitar.nylon', 'mallet.kalimba'], counter: ['guitar.nylon', 'mallet.marimba'] },
+  alt: {
+    lead: ['mallet.marimba', 'guitar.nylon', 'wind.flute'], arp: ['guitar.nylon', 'mallet.kalimba'],
+    counter: ['guitar.nylon', 'mallet.marimba'], bass: ['bass.finger'],
+  },
 }

@@ -1,13 +1,13 @@
 /**
  * Drum kits: `playDrum(v, kit, hit, at, vel, len?)`.
  *
- * Eight kits, each mapping all twelve hit names (k s c h o r p t m T x z) to
+ * Nine kits, each mapping all twelve hit names (k s c h o r p t m T x z) to
  * its own synthesis. The hits are built from a handful of primitives
  * (pitched body, filtered noise, metal cluster, NES noise) with per-kit
  * parameters, so every kit keeps one character: synthwave punchy and gated,
  * soft dusty lofi, tribal skins and wood, brushes, dry motorik, a muffled
- * heartbeat, NES noise-channel chip drums, and an acoustic kit in a room
- * (the analog end of the Era knob).
+ * heartbeat, NES noise-channel chip drums (the 8-bit end of the Era knob),
+ * an acoustic kit in a room, and a festival kit (the modern end).
  *
  * Every hit is one output gain (level × velocity) into the layer bus, and
  * optionally into the gated reverb or the acoustic kit's room. It is disconnected when its longest
@@ -581,13 +581,57 @@ const KITS: Record<KitId, Kit> = {
     },
     z: { fn: (h, _v, len) => riser(h, len, { from: 2400, to: 9500, q: 0.6, lvl: 0.7 }), lvl: 0.2 },
   },
+  // Festival (big room, progressive and future house, melodic trap): a kick with a long sub tail under a
+  // punch and a click, a clap laid over the snare, crisp hats and a short open hat for the offbeat, a shaker,
+  // deep toms for the builds, a crash with a sub impact under it (the drop) and a white-noise riser. Dry: the
+  // 80s gated room is not this era.
+  'kit.edm': {
+    k: {
+      fn: (h, vel) => {
+        body(h, { f0: 165 + 25 * vel, f1: 46, pTau: 0.03, decay: 0.25, lvl: 1 })
+        body(h, { f0: 340, f1: 120, pTau: 0.012, decay: 0.03, lvl: 0.45, type: 'triangle' })
+        noiseHit(h, { filters: [['highpass', 2200, 0.7], ['lowpass', 9000, 0.7]], decay: 0.004, lvl: 0.45 * vel })
+      },
+      lvl: 0.85,
+    },
+    s: {
+      fn: (h, vel) => {
+        clapHit(h, 1500, 1.0, 3, 0.008, 0.07, 0.75 * (0.6 + 0.4 * vel), 11000)
+        body(h, { f0: 260, f1: 200, pTau: 0.015, decay: 0.05, lvl: 0.4, type: 'triangle' })
+        noiseHit(h, { filters: [['highpass', 1800, 0.7], ['lowpass', 11000, 0.6]], decay: 0.11, lvl: 0.6 })
+      },
+      lvl: 0.85,
+    },
+    c: { fn: (h, vel) => clapHit(h, 1350, 1.0, 4, 0.0095, 0.1, 0.9 * (0.6 + 0.4 * vel), 10000), lvl: 0.85 },
+    h: { fn: hat('white', 8500, 0.016, 0.85, 11000), lvl: 0.42, pan: 0.18 },
+    o: {
+      fn: h => {
+        noiseHit(h, { buf: h.v.res.metal, filters: [['highpass', 7500, 0.7], ['bandpass', 10500, 0.6]], decay: 0.07, lvl: 0.7 })
+        noiseHit(h, { filters: [['highpass', 9000, 0.7]], decay: 0.06, lvl: 0.4 })
+      },
+      lvl: 0.45, pan: -0.12,
+    },
+    r: { fn: ride(5600, 0.3, 0.5, 0.05, 700), lvl: 0.26, pan: 0.3 },
+    p: { fn: shaker(8200, 0.004, 0.022, 0.75), lvl: 0.3, pan: -0.28 },
+    t: { fn: tom(80, 0.22, 0.25), lvl: 0.45, pan: -0.3 },
+    m: { fn: tom(110, 0.19, 0.25), lvl: 0.42 },
+    T: { fn: tom(150, 0.16, 0.25), lvl: 0.38, pan: 0.3 },
+    x: {
+      fn: (h, vel, len) => {
+        crash(3600, 0.85, 1, 13000)(h, vel, len)
+        body(h, { f0: 72, f1: 34, pTau: 0.22, decay: 0.42, lvl: 1.4 })
+      },
+      lvl: 0.2,
+    },
+    z: { fn: (h, _v, len) => riser(h, len, { from: 350, to: 9500, q: 0.9, lvl: 0.75 }), lvl: 0.24 },
+  },
 }
 
 /** Per-kit loudness (linear), calibrated so each kit's groove sits at about -24 LUFS through the drums layer. */
 const KIT_GAIN: Record<KitId, number> = {
   'kit.synthwave': 0.266, 'kit.soft': 0.209, 'kit.tribal': 0.199, 'kit.brush': 0.224,
   'kit.motorik': 0.316, 'kit.heartbeat': 0.178, 'kit.chip': 0.295,
-  'kit.acoustic': 0.2,
+  'kit.acoustic': 0.2, 'kit.edm': 0.2,
 }
 
 export const KIT_IDS = Object.keys(KITS) as KitId[]

@@ -244,7 +244,12 @@ export function pieceToLandscape(piece: Piece, base?: Landscape, opts: { written
       if (!isEmptyGroove(g) && formatDrumBar(g) !== top) { drums.fill = g; break }
     }
   }
-  if (percT.length) drums.perc = groovesOf(percT)
+  if (percT.length) {
+    drums.perc = groovesOf(percT)
+    const pk = percT[0]!.kit as KitId
+    if (pk !== drums.kit) drums.percKit = pk
+    else delete drums.percKit
+  }
 
   // Bass: the piece's line as a pattern from where it enters.
   let bass: BassSpec = { ...(base?.bass ?? { voice: DEFAULT_VOICES.bass!, patterns: DEFAULT_BASS }) }

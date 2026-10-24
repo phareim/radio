@@ -38,9 +38,9 @@ export const INSTRUMENT_DEFAULTS: Record<Instrument, Pick<Track, 'layer' | 'voic
 export function patternLibrary(landscapes: Landscape[]): LibraryItem[] {
   const out: LibraryItem[] = []
   for (const L of landscapes) {
-    const kit = L.drums.kit
     const first = (layer: string): Level => Math.max(0, L.layers.findIndex(ls => ls.includes(layer as never))) as Level
     const grooves = (kind: 'drums' | 'perc', list: Landscape['drums']['grooves'] | undefined) => {
+      const kit = kind === 'perc' ? L.drums.percKit ?? L.drums.kit : L.drums.kit
       const seen = new Set<string>()
       list?.forEach((g, lvl) => {
         const bar = formatDrumBar(g)
@@ -52,7 +52,7 @@ export function patternLibrary(landscapes: Landscape[]): LibraryItem[] {
     }
     grooves('drums', L.drums.grooves)
     const fill = formatDrumBar(L.drums.fill)
-    if (fill) out.push({ id: `${L.id}:fill`, name: `${L.name} fill`, kind: 'drums', from: L.id, level: first('drums'), kit, bar: fill })
+    if (fill) out.push({ id: `${L.id}:fill`, name: `${L.name} fill`, kind: 'drums', from: L.id, level: first('drums'), kit: L.drums.kit, bar: fill })
     grooves('perc', L.drums.perc)
     const parts: Array<[LibraryItem['kind'], VoiceId | undefined]> = [
       ['bass', L.bass.voice], ['arp', L.arp?.voice], ['lead', L.lead?.voice], ['pad', L.pad.voice],

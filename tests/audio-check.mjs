@@ -69,10 +69,10 @@ if (json) {
   for (const r of rows) {
     if (r.group !== group) {
       group = r.group
-      console.log(`\n${group.toUpperCase()}\n${'name'.padEnd(18)}  peak    rms   lufs   loud    pre  centroid  >5k%  nodes/s   render`)
+      console.log(`\n${group.toUpperCase()}\n${'name'.padEnd(18)}  peak    rms   lufs   loud    pre  centroid  >5k%  <100%  nodes/s   render`)
     }
     const s = r.stats
-    console.log(`${r.name.padEnd(18)} ${f1(s.peak)} ${f1(s.rms)} ${f1(s.lufs)} ${f1(s.mom)} ${f1(s.pre)} ${String(Math.round(s.centroid)).padStart(8)} ${s.hf.toFixed(1).padStart(5)} ${String(Math.round(r.nodesPerSec)).padStart(8)} ${String(Math.round(r.ms)).padStart(6)}ms`)
+    console.log(`${r.name.padEnd(18)} ${f1(s.peak)} ${f1(s.rms)} ${f1(s.lufs)} ${f1(s.mom)} ${f1(s.pre)} ${String(Math.round(s.centroid)).padStart(8)} ${s.hf.toFixed(1).padStart(5)} ${(s.lo ?? 0).toFixed(1).padStart(6)} ${String(Math.round(r.nodesPerSec)).padStart(8)} ${String(Math.round(r.ms)).padStart(6)}ms`)
     if (r.windows) console.log('   hits ' + r.windows.map(([h, w]) => `${h}:${w.peak.toFixed(0)}/${w.rms.toFixed(0)}`).join(' '))
   }
 }
