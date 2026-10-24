@@ -1,8 +1,8 @@
 /**
  * The played instruments (jam's piano, guitar and bass; any layer may use
  * them): keys.piano, keys.felt, guitar.nylon, guitar.steel, guitar.mute,
- * bass.finger, and the acoustic end of the Era knob: bass.upright (plucked
- * gut string) and mallet.vibes (vibraphone).
+ * bass.finger, and two more acoustic voices: bass.upright (plucked gut
+ * string) and mallet.vibes (vibraphone).
  *
  * Each note is a buffer rendered in JS (render.ts: Karplus-Strong strings,
  * additive pianos and vibraphone bars), cached per voice, pitch, velocity

@@ -10,6 +10,7 @@ Opus does; Opus can also compose new landscapes.
 | Part | Where | Docs |
 |---|---|---|
 | Engine (pure TS: theory, composer, conductor, Era palette, landscapes) | `engine/` | `docs/engine.md` |
+| Era knob: 8-BIT ↔ MODERN, the modern end festival EDM (supersaws, a deep sub, four on the floor or half time, builds and drops; it was ANALOG until 2026-10-24) | `engine/palette.ts`, `engine/modern.ts` | `docs/engine.md` (Era) |
 | Audio (Web Audio player, voices, drums, ambience, fx) | `engine/audio/` | `docs/engine.md` (player) |
 | Pixel scenes, one per landscape | `scene/` | `docs/landscapes.md` |
 | Pieces for jam (format, notation, piece conductor, landscape derivation, growing, pattern library) | `engine/piece/` | `docs/piece.md` |

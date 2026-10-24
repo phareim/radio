@@ -66,7 +66,7 @@
       <div v-show="!compact" class="deck__knobs">
         <IntensityBar />
         <PxSlider :model-value="controls.mood" label="MOOD" left="BRIGHT" right="DARK" :compact="narrow" color="#cfc6ff" @update:model-value="set({ mood: $event })" />
-        <PxSlider :model-value="controls.era" label="ERA" left="8-BIT" right="ANALOG" bipolar :compact="narrow" color="#ff8a3d" @update:model-value="set({ era: $event })" />
+        <PxSlider :model-value="controls.era" label="ERA" left="8-BIT" right="MODERN" bipolar :compact="narrow" color="#ff8a3d" @update:model-value="set({ era: $event })" />
         <PxSlider :model-value="controls.density" label="DENSITY" left="SPARSE" right="BUSY" :compact="narrow" color="#3fe0a0" @update:model-value="set({ density: $event })" />
         <PxSlider
           :model-value="controls.tempo"

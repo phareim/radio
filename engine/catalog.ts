@@ -17,12 +17,13 @@ const VOICES: Record<VoiceId, true> = {
   'keys.piano': true, 'keys.felt': true, 'guitar.nylon': true, 'guitar.steel': true, 'guitar.mute': true, 'bass.finger': true,
   'chip.lead': true, 'chip.bass': true, 'chip.pad': true, 'chip.bell': true,
   'strings.ensemble': true, 'wind.flute': true, 'mallet.vibes': true, 'bass.upright': true,
+  'lead.super': true, 'pluck.super': true, 'pad.super': true, 'bass.deep': true, 'bass.808': true, 'vox.chop': true,
 }
 export const VOICE_IDS = Object.keys(VOICES) as VoiceId[]
 
 const KITS: Record<KitId, true> = {
   'kit.synthwave': true, 'kit.soft': true, 'kit.tribal': true, 'kit.brush': true,
-  'kit.motorik': true, 'kit.heartbeat': true, 'kit.chip': true, 'kit.acoustic': true,
+  'kit.motorik': true, 'kit.heartbeat': true, 'kit.chip': true, 'kit.acoustic': true, 'kit.edm': true,
 }
 export const KIT_IDS = Object.keys(KITS) as KitId[]
 
@@ -58,4 +59,4 @@ export const SCENE_IDS = [
 export const INTENSITY_NAMES = ['STILL', 'DRIFT', 'CRUISE', 'DRIVE', 'SURGE'] as const
 
 /** Bumped when the composer or conductor changes in a way feedback should know about. */
-export const ENGINE_VERSION = '1.3.2'
+export const ENGINE_VERSION = '1.4.0'

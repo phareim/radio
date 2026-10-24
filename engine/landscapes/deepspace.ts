@@ -15,6 +15,7 @@ export const deepspace: Landscape = {
     { chords: '1 6', barsPerChord: 4, role: 'a' },
     { chords: '6 5', barsPerChord: 4, role: 'b' },
     { chords: '3 2', barsPerChord: 4, role: 'b' },
+    { chords: '5 1', barsPerChord: 4, role: 'bridge' },
   ],
   color: 0.6,
   pad: { voice: 'pad.glass' },
@@ -30,6 +31,7 @@ export const deepspace: Landscape = {
     motifs: [
       '5 - - - - - - - | 3 - - - - - - -',
       "1' - - - - - - - | 7 - - - 5 - - -",
+      '3 - - - - - - - | 2 - - - 1 - - -',
     ],
   },
   bells: { voice: 'bell.glass', density: 0.3 },
@@ -48,4 +50,5 @@ export const deepspace: Landscape = {
   fx: { reverb: 0.75, delay: 0.5, reverbSize: 9, tone: 0.6, grit: 0.1 },
   ambience: { 'space.hum': 0.4, shimmer: 0.2 },
   accent: '#6a7bff',
+  alt: { lead: ['lead.whistle', 'keys.felt', 'mallet.vibes'], arp: ['pluck.harp', 'mallet.vibes'], pad: ['pad.choir', 'pad.warm'] },
 }

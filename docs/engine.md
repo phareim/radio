@@ -15,7 +15,8 @@ engine/rng.ts          seeded RNG
 engine/composer.ts     writes bars: melody from motifs, bass, arp, drums, pads, bells
 engine/conductor.ts    ConductorLike: steers toward the Controls at musical boundaries
 engine/orchestra.ts    which instrument plays each layer, section by section (Landscape.alt, KIN)
-engine/palette.ts      the Era knob: each voice's and kit's chip and acoustic counterpart, the handover order
+engine/palette.ts      the Era knob: each voice's and kit's chip and modern counterpart, the handover orders
+engine/modern.ts       Era's modern end as a producer: four on the floor or half time, a deep sub, builds and drops
 engine/written.ts      written phrases (Landscape.written): parsing, pitch mapping, one bar of a quote
 engine/landscapes/     the built-in landscapes, one file each, index.ts lists them
 engine/audio/          the Web Audio side: player (scheduler), voices, drums, ambience, fx
@@ -41,8 +42,8 @@ where a musician would put them:
 | landscape | the current progression runs to its cadence, the lead drops out, then a 4-bar bridge pivots the harmony (common chord, else the new key's dominant) while tempo, fx and ambience glide; the new landscape arrives with pad and drone, then builds up layer by layer to the target intensity. Across a tempo gap of 12 bpm or more the bridge takes 8 bars (each chord two), the bass leaves with the arp two bars in, and the tempo glide (eased at both ends) runs on 4 bars past the arrival; nothing rhythmic enters until it has landed |
 | mood | the mode changes when the next progression starts |
 | density | next phrase |
-| era | voices and kits at the next phrase start (layer by layer, see Era); crush and tape glide over about a bar |
-| space | glides over about a bar. The radio has no Space knob: Era sets it too (`space = era`), dry at 8-bit, vast at analog; jam keeps its own |
+| era | voices, kits and (toward modern) the grooves at the next phrase start (layer by layer, see Era); crush, tape, low end and sidechain glide over about a bar |
+| space | glides over about a bar. The radio has no Space knob: Era sets it too (`space = era`), dry at 8-bit, vast at modern; jam keeps its own |
 | tempo | glides across the next phrase (eased at both ends) |
 | hold | freezes progression and motif; the section loops until released (the radio has no HOLD button since 2026-10-13; the control is still the engine's) |
 
@@ -83,46 +84,100 @@ Left at one intensity, the music still develops:
   returning A, which opens with a crash. The bass walks up into the next
   chord at the end of every section (and half the phrases) from pattern
   level 2.
+- **Section colour** (`colour` in `conductor.ts`, drawn from a stream of
+  its own, so the rest of the section is what it was). A2 and B may give
+  the pad a rhythm (`PadStyle`: re-struck eighths, a 3+3+2 push twice a
+  bar, offbeat stabs; A2 25 %, B 55 %, not in places under 76 bpm), a twin
+  lead a diatonic third below the tune (`thirdBelow`: a chord tone a third
+  to a sixth below where the third would clash on a strong beat; A2 20 %,
+  B 35 %, and 40 % of the returns, in place of the octave double), and an
+  accent pattern for the arp (3+3+2 or the offbeats; A2 30 %, B 40 %). Pad
+  rhythms and twin leads sound from pattern level 3. Every section picks
+  its fill (`fillOf`): the landscape's own (three in five), a tom run down
+  over the last beat, or a snare roll swelling over the second half.
+- **Pickups**: drums coming in play the second half of their fill in the
+  bar before, on a bus that opens a bar early for it; from intensity 3 a
+  riser rises under it, and the entry crashes (after a breath too: a
+  breakdown, a build, a drop).
 
 W sections (quotes) keep the landscape's own voices and shape.
 
 ## Era
 
 The Era knob runs from 8-BIT (0) through the landscape as written (0.5)
-to ANALOG (1). All of it is synthesis; the acoustic end is modelled
-instruments, not samples.
+to MODERN (1): the NES, the place itself, a festival main stage. All of it
+is synthesis.
 
 - **Voices** (`palette.ts`). Two tables give every `VoiceId` a chip
   counterpart (`CHIP`: melodic voices → `chip.lead`, arps → `arp.square`,
   pads → `chip.pad`, basses and drones → `chip.bass`, bells → `chip.bell`,
-  counter lines → `lead.pulse`) and an acoustic one (`ANALOG`: square and EP
-  leads → piano, saw lead → steel guitar, pulse → marimba, hollow, glide and
-  whistle → flute, FM lead and bells → vibes, arps → nylon or muted guitar
-  or harp, pads → `strings.ensemble` except the choir, basses → fingered or
-  upright, drones → organ); `CHIP_KITS` and `ANALOG_KITS` do the same for
-  kits (every kit → `kit.chip`; toward analog → `kit.acoustic`, brush and
-  tribal stay). A voice already of the end's character keeps itself. On the
-  chip side a melodic voice fits some layers badly, so on the arp layer it
+  counter lines → `lead.pulse`) and a modern one (`MODERN`: synth leads →
+  `lead.super`, the airy ones (hollow, whistle, flute) → `vox.chop`, keys,
+  mallets, plucked strings and arps → `pluck.super`, pads and bowed
+  strings → `pad.super`, basses → `bass.deep`, bells and the soft counter
+  line → `vox.chop`, the string counter → one `pad.super` line, drones →
+  `drone.sub`, the shimmer → `pad.super`); `CHIP_KITS` and `MODERN_KITS`
+  do the same for kits (every kit → `kit.chip`, or → `kit.edm`). A voice
+  already of the end's character keeps itself. Some layers want one sound
+  whatever they played: toward 8-bit a melodic voice on the arp layer
   becomes `arp.square`, on the counter `lead.pulse` (apart from the lead),
-  on pad, bass and bells their chip voice.
+  on pad, bass and bells their chip voice; toward modern the arp is
+  `pluck.super`, the pad `pad.super`, the bells `vox.chop`, the bass
+  `bass.deep` (or the 808 it is), and a counter line never takes the
+  anthem lead.
 - **Handover**: with `d = |era − 0.5| · 2`, a layer hands over once `d`
-  reaches its threshold: drone and pad 0.2, drums and perc 0.35, bells 0.45,
-  arp 0.55, bass 0.65, counter 0.75, lead 0.85. The beds change colour first
-  and the tune last; at 0 or 1 everything has handed over, at 0.5 nothing.
-- **Latching**: the conductor reads `era` for the voices at phrase starts
-  (and on a landscape's arrival), so no one changes instrument mid-phrase.
-  It maps each bar after composing it, over every note and drum hit
-  (composed, quoted, bridge, lead double, riser), copying the events it
-  changes; the composer never sees Era, so the music itself is the same at
-  any setting. Then every `chip.pad` note gets `opts.chord = [index, count]`,
-  its place by pitch among the chip.pad notes of its layer starting on the
-  same step, for the voice to arpeggiate the chord.
+  reaches its threshold. Toward 8-bit the beds change colour first and the
+  tune last (`HANDOVER`): drone and pad 0.2, drums and perc 0.35, bells
+  0.45, arp 0.55, bass 0.65, counter 0.75, lead 0.85. Toward modern the beat
+  and the low end go first, as they are most of what makes music sound now
+  (`MODERN_HANDOVER`): drums and bass 0.2, drone, pad and perc 0.35, arp and
+  bells 0.55, counter 0.75, lead 0.85. The radio's knob moves in tenths, so
+  each step hands over the next group; at 0 or 1 everything has, at 0.5
+  nothing.
+- **The modern producer** (`modern.ts`). Once the drums and the bass have
+  handed over toward modern, every composed bar's drums and bass are remade
+  (a quote keeps its own parts, on the modern sounds):
+  - From 100 bpm (`FOUR_FROM_BPM`) four on the floor: a kick on every beat,
+    the clap on two and four, an open hat on every offbeat, sixteenth hats
+    from level 3; the bass on the offbeats at level 2, in pairs of
+    sixteenths at 3, rolling sixteenths between the kicks at 4. Below 100
+    bpm half time (future bass, melodic trap): a kick on one and the
+    and-of-three, snare and clap on two and four, hats rolling in
+    thirty-seconds into every other bar at level 4, and 808s held to the
+    next note that slide (legato) between pitches.
+  - The bass plays the chord's bass note between E1 and D#2 (`subNote`), an
+    octave up now and then for bounce; with no drums under it, it holds each
+    chord; where the composer wrote no bass, there is none.
+  - Fills: before a new section a build (a snare roll from eighths into
+    sixteenths under a white-noise riser, the kick and the bass gone for the
+    last beat), and the new section crashes on its downbeat even as a layer
+    enters: the drop. Inside a section a lift (the groove, a sixteenth roll
+    over its second half); drums about to leave close with a tom run; drums
+    about to enter get the build's second half as their pickup.
+  - Swing falls to a third of the landscape's.
+  It draws nothing at random, so back in the middle the music is what it
+  would have been.
+- **Latching**: the conductor reads `era` (and the modern groove style, from
+  the tempo) at phrase starts (and on a landscape's arrival), so no one
+  changes instrument or groove mid-phrase. It remakes and maps each bar
+  after composing it, over every note and drum hit (composed, quoted,
+  bridge, lead double, riser), copying the events it changes; the composer
+  never sees Era, so the tune is the same at any setting. Then every
+  `chip.pad` note gets `opts.chord = [index, count]`, its place by pitch
+  among the chip.pad notes of its layer starting on the same step, for the
+  voice to arpeggiate the chord.
 - **Effects** (`shapeFx`): with `c = max(0, 0.5 − era)·2` and
-  `a = max(0, era − 0.5)·2`, tape (`fx.grit`) is the landscape's own at the
-  middle (`FxSpec.grit·0.4 + 0.225`), falls to 0 toward 8-bit and rises by up
-  to 0.35 toward analog; `fx.crush = 0.75·c²` (`ERA_CRUSH`), so the first
+  `m = max(0, era − 0.5)·2`, tape (`fx.grit`) is the landscape's own at the
+  middle (`FxSpec.grit·0.4 + 0.225`), falls to 0 toward 8-bit and is gone by
+  `m = 0.5` toward modern; `fx.crush = 0.75·c²` (`ERA_CRUSH`), so the first
   stretch toward 8-bit is subtle and the far end stops short of the coarse
-  staircase's crackle. They glide like the other fx.
+  staircase's crackle. Toward modern the tone opens to 0.95, `fx.low = m`
+  lifts a master low shelf (up to +2 dB under 90 Hz) and, while drums play,
+  `fx.sidechain = √m` has every kick duck the pitched layers (`SIDECHAIN` in
+  `core.ts`: pads and drones 0.85, bass 0.8, arp and counter 0.6, bells 0.5,
+  lead 0.35 of the way down) and let them swell back over about a third of
+  a beat (the bass sooner, for its offbeat), a little past unity, so the
+  ducking costs them no loudness. They glide like the other fx.
 - jam's piece conductor uses Era only for the effects: a piece's
   instruments are hand-picked.
 
@@ -192,10 +247,11 @@ A texture missing from `BarPlan.ambience` fades to 0; a layer missing from
   bar. Swing delays odd sixteenths by `swing × sixteenth`.
 - **Mix**: every `Layer` has its own gain bus with sends to reverb and delay.
   `mix[layer].gain` is reached over `fadeBars` bars from the bar start
-  (`linearRampToValueAtTime`). The kick ducks pad and drone by `fx.pump`.
-- **FX** (`fx.ts`): master chain = tone low-pass → bit crush → tape
-  saturation (grit) → stereo width → compressor → limiter → destination and a
-  MediaStreamDestination. The crush is a parallel path through two
+  (`linearRampToValueAtTime`). The kick ducks pad and drone by `fx.pump`
+  and, toward modern, every pitched layer by `fx.sidechain` (see Era).
+- **FX** (`fx.ts`): master chain = low shelf (`fx.low`) → tone low-pass →
+  bit crush → tape saturation (grit) → stereo width → compressor → limiter →
+  destination and a MediaStreamDestination. The crush is a parallel path through two
   staircase WaveShapers (7 and 5 bits, no oversampling, so it aliases like a
   console), the finer fading into the coarser as `fx.crush` rises, low-passed
   at 9 kHz and mixed in at up to 45 % (dry + wet stays at unity).
@@ -229,7 +285,20 @@ A texture missing from `BarPlan.ambience` fades to 0; a layer missing from
   modelled: `strings.ensemble` is two sawtooth players per note with their own
   late vibrato, bow noise and a shared body (levelled for 4-note chords; a
   single line plays louder); `wind.flute` has harmonics, breath, a chiff and
-  a late vibrato. `kit.acoustic` is a kit in a small shared room.
+  a late vibrato. `kit.acoustic` is a kit in a small shared room. The
+  modern voices are festival EDM, their saws free-running (each started a
+  random part of a cycle early, so a stack shimmers instead of phasing):
+  `lead.super` seven saws over ±36 cents and one an octave below;
+  `pluck.super` four through a low-pass that snaps shut; `pad.super` six a
+  note, high-passed at 210 Hz (a single counter or lead line louder, as with
+  strings.ensemble); `bass.deep` a sine sub (an octave lower too above E2)
+  under a saturated, resonant growl that small speakers hear; `bass.808` a
+  long saturated sine dropping into its pitch from a fifth up, sliding from
+  the last note when legato (the core keeps its glide state like
+  lead.glide's); `vox.chop` a saw and a breath through three formant
+  band-passes, a vowel leaning toward the next, scooping into the note.
+  `kit.edm` has a kick with a long sub tail, a clap laid over the snare,
+  crisp hats, deep toms and a crash with a sub impact under it.
 - **Live notes**: `player.live(layer, sound, vel, pan?)` plays a voice or a drum
   hit 5 ms from now on the layer's bus (a voice with a 30 s nominal length that
   `release()` ends; the glide lead slides while the previous live note is held).

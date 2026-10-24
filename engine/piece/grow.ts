@@ -39,8 +39,8 @@ export function stringSeed(s: string): number {
 /** L with `from`'s part for one layer. */
 function borrow(L: Landscape, from: Landscape, layer: Layer): Landscape {
   switch (layer) {
-    case 'drums': return { ...L, drums: { ...from.drums, perc: L.drums.perc } }
-    case 'perc': return from.drums.perc ? { ...L, drums: { ...L.drums, kit: from.drums.kit, perc: from.drums.perc } } : L
+    case 'drums': return { ...L, drums: { ...from.drums, perc: L.drums.perc, percKit: L.drums.percKit } }
+    case 'perc': return from.drums.perc ? { ...L, drums: { ...L.drums, kit: from.drums.kit, perc: from.drums.perc, percKit: from.drums.percKit } } : L
     case 'bass': return { ...L, bass: from.bass }
     case 'pad': return { ...L, pad: from.pad }
     case 'drone': case 'arp': case 'lead': case 'counter': case 'bells':
@@ -153,7 +153,8 @@ function grow(piece: Piece, layer: Layer, level: Level, enter: Level, L: Landsca
     source: 'grown',
     bars,
   }
-  if (layer === 'drums' || layer === 'perc') track.kit = G.drums.kit
+  if (layer === 'drums') track.kit = G.drums.kit
+  else if (layer === 'perc') track.kit = G.drums.percKit ?? G.drums.kit
   else track.voice = voiceOf(G, layer)
   return track
 }

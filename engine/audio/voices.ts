@@ -14,8 +14,11 @@
  *
  * The Era knob's ends: the chip voices (chip.*) are NES channels, exactly in
  * tune, unfiltered, their volume and vibrato stepped at the 60 Hz frame
- * rate; the acoustic voices (strings.ensemble, wind.flute here, bass.upright
- * and mallet.vibes in instruments.ts) model the real instruments.
+ * rate; the modern voices (lead.super, pluck.super, pad.super, bass.deep,
+ * bass.808, vox.chop) are festival EDM: free-running supersaw stacks, deep
+ * saturated subs, a vocal chop. The acoustic voices (strings.ensemble,
+ * wind.flute here, bass.upright and mallet.vibes in instruments.ts) model
+ * the real instruments.
  *
  * Levels: LEVEL[id] scales each patch so they sit at a similar loudness for
  * the same velocity (calibrated with tests/audio-harness). The mix balance
@@ -48,6 +51,7 @@ const LEVEL: Record<Exclude<VoiceId, InstrumentId>, number> = {
   'drone.sub': 0.0627, 'drone.organ': 0.0456, 'drone.shimmer': 0.0342,
   'chip.lead': 0.198, 'chip.bass': 0.0687, 'chip.pad': 0.113, 'chip.bell': 0.7,
   'strings.ensemble': 0.0412, 'wind.flute': 0.083,
+  'lead.super': 0.109, 'pluck.super': 0.174, 'pad.super': 0.0745, 'bass.deep': 0.0692, 'bass.808': 0.0797, 'vox.chop': 0.26,
 }
 
 // ---- helpers -----------------------------------------------------------------
@@ -913,7 +917,7 @@ const chipBell: Patch = (v, midi, at, _dur, vel, _o, pan) => {
   return chipSteps(n, 0, LEVEL['chip.bell'], steps, 0, false)
 }
 
-// ---- acoustic voices (the analog end of Era) ---------------------------------------------------
+// ---- acoustic voices (modelled instruments) ---------------------------------------------------
 
 /**
  * The string section's body: fixed resonances of the instruments' wood and
@@ -1029,6 +1033,230 @@ const windFlute: Patch = (v, midi, at, dur, vel, _o, pan) => {
   return done(n, dur, { peak: LEVEL['wind.flute'] * velAmp(vel), a: 0.08 - 0.04 * vel, d: 0.3, s: 0.92, r: 0.12 })
 }
 
+// ---- modern voices (the modern end of Era) -------------------------------------------------------
+
+/** Phases of a free-running stack: eight sawtooths, each starting its cycle an eighth further on. */
+const SAW_PHASES = 8
+
+/** A sawtooth (64 harmonics) whose cycle starts `k / SAW_PHASES` of the way in; built once per context. */
+function sawAt(res: Resources, k: number): PeriodicWave {
+  return res.wave(`saw.phase:${k}`, () => {
+    const N = 64
+    const real = new Float32Array(N + 1)
+    const imag = new Float32Array(N + 1)
+    const phi = (2 * Math.PI * k) / SAW_PHASES
+    for (let h = 1; h <= N; h++) {
+      // The saw's series, Σ (-1)^(h+1) 2/(πh) sin(hx), shifted by phi.
+      const a = ((h % 2 ? 2 : -2) / (Math.PI * h))
+      imag[h] = a * Math.cos(h * phi)
+      real[h] = a * Math.sin(h * phi)
+    }
+    return res.ac.createPeriodicWave(real, imag)
+  })
+}
+
+/**
+ * A detuned stack of saws, one per entry of `detunes` (cents), each on its
+ * own phase so the stack runs free from its first cycle (in phase, the saws
+ * would line up into one spike on the attack and sweep like a flanger), also
+ * for a note played live. `sides` sends each left (-1), right (1) or to both (0).
+ */
+function detunedStack(
+  n: Note, f: number, detunes: readonly number[], sides: readonly number[], left: AudioNode, right: AudioNode,
+): OscillatorNode[] {
+  const turn = Math.floor(Math.random() * SAW_PHASES)
+  return detunes.map((cents, i) => {
+    const o = waveOsc(n, sawAt(n.res, (turn + i * 3) % SAW_PHASES), f)
+    o.detune.value = cents
+    const side = sides[i] ?? 0
+    if (side <= 0) o.connect(left)
+    if (side >= 0) o.connect(right)
+    return o
+  })
+}
+
+/** The modern basses' saturation: a symmetric tanh (odd harmonics only, so no DC), shared by every note. */
+const SAT = (() => {
+  const c = new Float32Array(2048)
+  for (let i = 0; i < c.length; i++) c[i] = Math.tanh(2.4 * ((i / (c.length - 1)) * 2 - 1)) / Math.tanh(2.4)
+  return c
+})()
+
+function saturator(ac: BaseAudioContext): WaveShaperNode {
+  const ws = ac.createWaveShaper()
+  ws.curve = SAT
+  return ws
+}
+
+/**
+ * Festival supersaw lead: seven saws spread over ±36 cents (the centre one in
+ * both ears, the pairs split), free-running, and a saw an octave below for
+ * weight; high-passed clear of the bass, the low-pass bright with a little
+ * more bite on the attack, a late vibrato on long notes.
+ */
+const leadSuper: Patch = (v, midi, at, dur, vel, _o, pan) => {
+  const n = begin(v.res, at, v.out.input, pan)
+  const f = hz(midi)
+  const l = gain(n.ac, 0.5)
+  const r = gain(n.ac, 0.5)
+  const saws = detunedStack(n, f, [0, -11, 11, -23, 23, -36, 36], [0, -1, 1, 1, -1, -1, 1], l, r)
+  const low = osc(n, 'sawtooth', f / 2)
+  const lg = gain(n.ac, 0.4)
+  low.connect(lg)
+  lg.connect(l)
+  lg.connect(r)
+  const hp = filter(n.ac, 'highpass', 150, 0.6)
+  const lp = filter(n.ac, 'lowpass', 6000, 0.7)
+  const open = Math.min(13000, keyTrack(5000, midi, 0.5) * (0.75 + 0.5 * vel))
+  sweep(n, lp, open * 1.7, open, 0.12)
+  chain(stereo(n.ac, l, r), hp, lp, n.amp)
+  vibrato(n, [...saws, low], dur, 5.4, 8, 0.32)
+  return done(n, dur, { peak: LEVEL['lead.super'] * velAmp(vel), a: 0.005, d: 0.35, s: 0.82, r: 0.22 })
+}
+
+/**
+ * Supersaw pluck (progressive and future house): four free-running saws
+ * spread ±24 cents, two each side, through a resonant low-pass that snaps
+ * shut, so every note is a bright pick with a short glassy tail.
+ */
+const pluckSuper: Patch = (v, midi, at, dur, vel, _o, pan) => {
+  const n = begin(v.res, at, v.out.input, pan)
+  const f = hz(midi)
+  const l = gain(n.ac, 0.55)
+  const r = gain(n.ac, 0.55)
+  detunedStack(n, f, [-9, 9, -24, 24], [-1, 1, 1, -1], l, r)
+  const hp = filter(n.ac, 'highpass', 170, 0.6)
+  const lp = filter(n.ac, 'lowpass', 3000, 2.4)
+  chain(stereo(n.ac, l, r), hp, lp, n.amp)
+  const top = Math.min(14000, keyTrack(6000, midi, 0.4) * (0.55 + 0.65 * vel))
+  sweep(n, lp, top, keyTrack(650, midi, 0.5), clamp(dur * 0.35, 0.05, 0.16))
+  return done(n, dur, { peak: LEVEL['pluck.super'] * velAmp(vel), a: 0.002, d: 0.17, s: 0.28, r: 0.13 })
+}
+
+/**
+ * Supersaw pad: six free-running saws a note, three each side, spread ±30
+ * cents; the low-pass opens over the swell and settles bright, the
+ * high-pass leaves the low end to the bass. Made to pump under the kick (the
+ * player's sidechain does it). LEVEL is for four-note chords; a single line
+ * (counter, lead) plays about 5.5 dB louder to match.
+ */
+const padSuper: Patch = (v, midi, at, dur, vel, _o, pan) => {
+  const n = begin(v.res, at, v.out.input, pan)
+  const f = hz(midi)
+  const l = gain(n.ac, 0.5)
+  const r = gain(n.ac, 0.5)
+  detunedStack(n, f, [-30, -12, 7, -7, 12, 30], [-1, -1, -1, 1, 1, 1], l, r)
+  const hp = filter(n.ac, 'highpass', 210, 0.6)
+  const lp = filter(n.ac, 'lowpass', 2000, 0.6)
+  const lo = keyTrack(2300, midi, 0.35)
+  lp.frequency.setValueAtTime(safeHz(n.ac, lo * 0.55), at)
+  lp.frequency.linearRampToValueAtTime(safeHz(n.ac, lo * 1.7), at + clamp(dur * 0.4, 0.2, 1.5))
+  lp.frequency.linearRampToValueAtTime(safeHz(n.ac, lo * 1.35), at + clamp(dur, 0.4, 3))
+  chain(stereo(n.ac, l, r), hp, lp, n.amp)
+  const line = v.layer === 'counter' || v.layer === 'lead' ? 1.9 : 1
+  return done(n, dur, { peak: LEVEL['pad.super'] * line * velAmp(vel), a: padAttack(dur, 0.28), d: 0.5, s: 1, r: 0.55 })
+}
+
+/**
+ * Modern sub bass: a sine on the note (and one an octave under it when the
+ * note sits above E2, so it always reaches the sub) under a growl: a saw and
+ * a square an octave up, saturated, through a resonant low-pass that bites on
+ * the attack and settles. The growl is what phones and laptops hear; the sub
+ * is what the room feels. Punchy on offbeat eighths, solid held.
+ */
+const bassDeep: Patch = (v, midi, at, dur, vel, _o, pan) => {
+  const n = begin(v.res, at, v.out.input, pan)
+  const f = hz(midi)
+  const high = midi > 40
+  const sg = gain(n.ac, 0.75)
+  osc(n, 'sine', high ? f / 2 : f).connect(sg)
+  sg.connect(n.amp)
+  if (high) {
+    const bg = gain(n.ac, 0.45)
+    osc(n, 'sine', f).connect(bg)
+    bg.connect(n.amp)
+  }
+  const drive = gain(n.ac, 1.6 + 1.2 * vel)
+  osc(n, 'sawtooth', f, 7).connect(drive)
+  const sq = gain(n.ac, 0.35)
+  osc(n, 'square', f * 2, -5).connect(sq)
+  sq.connect(drive)
+  const lp = filter(n.ac, 'lowpass', 500, 3.2)
+  sweep(n, lp, Math.min(2400, 1500 * (0.6 + 0.6 * vel)), keyTrack(360, midi, 0.3), 0.09)
+  chain(drive, saturator(n.ac), lp, gain(n.ac, 0.5), n.amp)
+  return done(n, dur, { peak: LEVEL['bass.deep'] * velAmp(vel), a: 0.004, d: 0.28, s: 0.85, r: 0.06 })
+}
+
+/**
+ * 808: a long sine that drops into its pitch from a fifth above (the boom),
+ * saturated so its odd harmonics carry it on small speakers, decaying slowly
+ * while held. Played legato, it slides from the last note instead (trap's
+ * gliding 808).
+ */
+const bass808: Patch = (v, midi, at, dur, vel, opts, pan) => {
+  const n = begin(v.res, at, v.out.input, pan)
+  const f = hz(midi)
+  const prev = v.glide
+  const legato = !!opts?.legato && prev !== null && prev.end >= at - 0.06 && prev.midi !== midi
+  const o = osc(n, 'sine', f)
+  if (legato && prev) {
+    o.frequency.setValueAtTime(safeHz(n.ac, hz(prev.midi)), at)
+    o.frequency.exponentialRampToValueAtTime(safeHz(n.ac, f), at + Math.min(0.09, dur * 0.4))
+  } else {
+    o.frequency.setValueAtTime(safeHz(n.ac, f * 1.5), at)
+    o.frequency.setTargetAtTime(safeHz(n.ac, f), at, 0.016)
+  }
+  v.glide = { midi, end: at + dur }
+  const clean = gain(n.ac, 0.7)
+  o.connect(clean)
+  clean.connect(n.amp)
+  chain(o, gain(n.ac, 2 + 1.5 * vel), saturator(n.ac), filter(n.ac, 'lowpass', keyTrack(900, midi, 0.5), 0.6), gain(n.ac, 0.3), n.amp)
+  return done(n, dur, { peak: LEVEL['bass.808'] * velAmp(vel), a: legato ? 0.012 : 0.003, d: 0.7, s: 0.55, r: 0.12 })
+}
+
+/** Vowel formants F1–F3 (Hz) of a high voice: ah, oh, eh, oo. A chop sings one and leans toward the next. */
+const VOWELS: ReadonlyArray<readonly [number, number, number]> = [
+  [850, 1220, 2810], [590, 920, 2710], [560, 1860, 2600], [400, 900, 2650],
+]
+
+/**
+ * Vocal chop (future bass, tropical house): a buzzy voice (a saw with its top
+ * rolled off and a breath of noise) through three formant band-passes,
+ * scooping up into the note. Each note sings a vowel and leans toward the
+ * next over its length (a chopped 'ah-oh'); short notes are chops, long ones
+ * sing on with a vibrato that comes in late.
+ */
+const voxChop: Patch = (v, midi, at, dur, vel, _o, pan) => {
+  const n = begin(v.res, at, v.out.input, pan)
+  const f = hz(midi)
+  const src = osc(n, 'sawtooth', f)
+  src.detune.setValueAtTime(-70, at)
+  src.detune.setTargetAtTime(0, at, 0.022)
+  const throat = filter(n.ac, 'lowpass', clamp(f * 6, 1800, 5000), 0.5)
+  src.connect(throat)
+  const air = gain(n.ac, 0.06)
+  noise(n, n.res.white).connect(air)
+  air.connect(throat)
+  const k = Math.floor(Math.random() * VOWELS.length)
+  const from = VOWELS[k]!
+  const to = VOWELS[(k + 1) % VOWELS.length]!
+  const Q = [6, 9, 12]
+  const LVL = [1, 0.6, 0.3]
+  for (let i = 0; i < 3; i++) {
+    const bp = filter(n.ac, 'bandpass', from[i]!, Q[i]!)
+    if (dur > 0.2) {
+      bp.frequency.setValueAtTime(safeHz(n.ac, from[i]!), at)
+      bp.frequency.linearRampToValueAtTime(safeHz(n.ac, to[i]!), at + dur)
+    }
+    const g = gain(n.ac, LVL[i]!)
+    throat.connect(bp)
+    bp.connect(g)
+    g.connect(n.amp)
+  }
+  vibrato(n, [src], dur, 5.6, 22, 0.3)
+  return done(n, dur, { peak: LEVEL['vox.chop'] * velAmp(vel), a: 0.008, d: 0.16, s: 0.72, r: 0.09 })
+}
+
 // ---- dispatch ------------------------------------------------------------------------------------
 
 const PATCHES: Record<VoiceId, Patch> = {
@@ -1045,6 +1273,8 @@ const PATCHES: Record<VoiceId, Patch> = {
   'drone.sub': droneSub, 'drone.organ': droneOrgan, 'drone.shimmer': droneShimmer,
   'chip.lead': chipLead, 'chip.bass': chipBass, 'chip.pad': chipPad, 'chip.bell': chipBell,
   'strings.ensemble': stringsEnsemble, 'wind.flute': windFlute,
+  'lead.super': leadSuper, 'pluck.super': pluckSuper, 'pad.super': padSuper,
+  'bass.deep': bassDeep, 'bass.808': bass808, 'vox.chop': voxChop,
   ...INSTRUMENTS,
 }
 

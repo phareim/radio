@@ -9,7 +9,8 @@ import { createRng } from '../engine/rng.ts'
 import { parseToken } from '../engine/theory.ts'
 import { noteName } from '../engine/piece/notation.ts'
 import { mapPitch } from '../engine/written.ts'
-import { ANALOG, ANALOG_KITS, CHIP, CHIP_KITS, eraKit, eraVoice, HANDOVER } from '../engine/palette.ts'
+import { CHIP, CHIP_KITS, eraKit, eraVoice, HANDOVER, MODERN, MODERN_HANDOVER, MODERN_KITS } from '../engine/palette.ts'
+import { subNote } from '../engine/modern.ts'
 import { KIT_IDS, VOICE_IDS } from '../engine/catalog.ts'
 import { LAYERS } from '../engine/types.ts'
 import type { BarPlan, Controls, KitId, Landscape, Layer, VoiceId } from '../engine/types.ts'
@@ -131,8 +132,9 @@ test('hold loops the section exactly', () => {
 
 test('built-in landscapes plan exactly as pinned', () => {
   // SHA-256 of the plans over scripted sessions on every built-in (last set
-  // for engine 1.3.2: Era's crush and tape end lower; notes and drums are
-  // those of 1.3.0): a landscape without `written` must plan byte for byte the same.
+  // for engine 1.4.0: Era's modern end with its producer, the sections'
+  // colour, audible pickups, the channels' perc, bells, progressions and
+  // themes): a landscape without `written` must plan byte for byte the same.
   // Change the hash only for a deliberate change to the composer or conductor.
   const h = createHash('sha256')
   const ids = BUILTIN.map(l => l.id)
@@ -149,7 +151,7 @@ test('built-in landscapes plan exactly as pinned', () => {
       h.update(JSON.stringify(c.nextBar()))
     }
   }
-  assert.equal(h.digest('hex'), 'a8f9690ab98141dbfcc476bc331b73841f432b58eada683da8cef660822cce91')
+  assert.equal(h.digest('hex'), 'b515cecefd8d367104dc33e8d5203bbc5d6448e3d5400d06a71d58d8bd9a194f')
 })
 
 /**
@@ -442,6 +444,49 @@ test('a call phrase leaves the lead silent while the counter line echoes', () =>
   assert.ok(found, 'no call phrase found')
 })
 
+test('sections bring their own colour: a pad rhythm and a twin lead from drive up, perc on its own kit', () => {
+  let rhythm = 0
+  let twins = 0
+  for (const seed of [1, 2, 3]) {
+    const plans = run(seed, 400, i => (i === 300 ? { intensity: 2 } : null), { landscape: 'coast', intensity: 4 })
+    for (const p of plans) {
+      const pad = p.notes.filter(n => n.layer === 'pad')
+      const struck = new Set(pad.map(n => n.step)).size > p.chords.length
+      if (struck) {
+        rhythm++
+        assert.ok(p.meta.intensity >= 3, `bar ${p.index}: a pad rhythm at level ${p.meta.intensity}`)
+      }
+      const lead = p.notes.filter(n => n.layer === 'lead')
+      for (const t of lead.filter(n => n.pan === 0.22)) {
+        twins++
+        const tune = lead.find(n => n.pan !== 0.22 && n.step === t.step)
+        assert.ok(tune, `bar ${p.index}: a twin without its note`)
+        const gap = tune!.midi - t.midi
+        assert.ok(gap >= 3 && gap <= 9, `bar ${p.index}: twin ${gap} semitones below`)
+        assert.ok(p.meta.intensity >= 3)
+      }
+      for (const d of p.drums.filter(d => d.layer === 'perc')) assert.equal(d.kit, 'kit.tribal')
+    }
+  }
+  assert.ok(rhythm > 10, `${rhythm} bars with a pad rhythm`)
+  assert.ok(twins > 20, `${twins} twin-lead notes`)
+})
+
+test('drums coming in sound their pickup, and rise into it from drive up', () => {
+  const plans = run(7, 40, () => null, { landscape: 'coast', intensity: 4 })
+  const enter = plans.findIndex(p => p.meta.active.includes('drums'))
+  const pick = plans[enter - 1]!
+  assert.ok(!pick.meta.active.includes('drums'))
+  assert.equal(pick.mix.drums!.gain, 1, 'the bus opens for the pickup')
+  assert.ok(pick.drums.some(d => d.layer === 'drums' && d.step >= 8 && d.hit !== 'z'), 'a pickup fill')
+  assert.ok(pick.drums.some(d => d.hit === 'z'), 'a riser into it')
+  assert.ok(plans[enter]!.drums.some(d => d.hit === 'x' && d.step === 0), 'a crash on the downbeat')
+  // Lower down there is a pickup but no riser.
+  const calm = run(7, 40, () => null, { landscape: 'coast', intensity: 2 })
+  const at = calm.findIndex(p => p.meta.active.includes('drums'))
+  assert.ok(!calm[at - 1]!.drums.some(d => d.hit === 'z'))
+})
+
 test('the bass walks into the next section', () => {
   const plans = run(2, 200, () => null, { landscape: 'coast', intensity: 3 })
   const ends = plans.filter((p, i) => plans[i + 1] && plans[i + 1]!.meta.section !== p.meta.section && p.meta.section !== 'bridge'
@@ -457,22 +502,23 @@ test('the bass walks into the next section', () => {
 // ---- era ----------------------------------------------------------------------
 
 const CHIP_VOICES = new Set<VoiceId>(Object.values(CHIP))
-const ACOUSTIC_VOICES = new Set<VoiceId>(Object.values(ANALOG))
+const MODERN_VOICES = new Set<VoiceId>(Object.values(MODERN))
 
 test('the era tables cover every voice and kit, and each end is where it stays', () => {
   const sorted = (xs: string[]) => [...xs].sort()
-  for (const t of [CHIP, ANALOG]) {
+  for (const t of [CHIP, MODERN]) {
     assert.deepEqual(sorted(Object.keys(t)), sorted(VOICE_IDS))
     for (const v of Object.values(t)) assert.ok(VOICE_IDS.includes(v), v)
     for (const v of VOICE_IDS) assert.equal(t[t[v]], t[v], `${v} → ${t[v]} moves again`)
   }
-  for (const t of [CHIP_KITS, ANALOG_KITS]) {
+  for (const t of [CHIP_KITS, MODERN_KITS]) {
     assert.deepEqual(sorted(Object.keys(t)), sorted(KIT_IDS))
     for (const k of KIT_IDS) assert.equal(t[t[k]], t[k])
   }
   for (const v of ['chip.lead', 'chip.bass', 'chip.pad', 'chip.bell', 'arp.square', 'lead.pulse'] as VoiceId[]) assert.equal(CHIP[v], v)
   assert.deepEqual([...CHIP_VOICES].sort(), ['arp.square', 'chip.bass', 'chip.bell', 'chip.lead', 'chip.pad', 'lead.pulse'])
-  for (const l of LAYERS) assert.ok(HANDOVER[l] > 0 && HANDOVER[l] <= 1)
+  assert.deepEqual([...MODERN_VOICES].sort(), ['bass.808', 'bass.deep', 'drone.sub', 'lead.super', 'pad.super', 'pluck.super', 'vox.chop'])
+  for (const l of LAYERS) assert.ok(HANDOVER[l] > 0 && HANDOVER[l] <= 1 && MODERN_HANDOVER[l] > 0 && MODERN_HANDOVER[l] <= 1)
 })
 
 test('era 0.5 maps every voice and kit to itself; the ends map every layer', () => {
@@ -480,30 +526,44 @@ test('era 0.5 maps every voice and kit to itself; the ends map every layer', () 
     for (const v of VOICE_IDS) {
       assert.equal(eraVoice(v, l, 0.5), v)
       assert.ok(CHIP_VOICES.has(eraVoice(v, l, 0)), `${l} ${v} at 0`)
-      assert.ok(ACOUSTIC_VOICES.has(eraVoice(v, l, 1)), `${l} ${v} at 1`)
+      assert.ok(MODERN_VOICES.has(eraVoice(v, l, 1)), `${l} ${v} at 1`)
     }
     for (const k of KIT_IDS) {
       assert.equal(eraKit(k, l, 0.5), k)
       assert.equal(eraKit(k, l, 0), 'kit.chip')
-      assert.ok(['kit.acoustic', 'kit.brush', 'kit.tribal'].includes(eraKit(k, l, 1)))
+      assert.equal(eraKit(k, l, 1), 'kit.edm')
     }
   }
-  // Layer by layer: beds first, the lead last.
+  // Toward 8-bit layer by layer, beds first, the lead last.
   assert.equal(eraVoice('pad.saw', 'pad', 0.4), 'chip.pad')
   assert.equal(eraVoice('lead.square', 'lead', 0.4), 'lead.square')
   assert.equal(eraVoice('lead.square', 'lead', 0.1), 'lead.square')
   assert.equal(eraVoice('lead.square', 'lead', 0.05), 'chip.lead')
-  assert.equal(eraVoice('bass.saw', 'bass', 0.8), 'bass.saw')
-  assert.equal(eraVoice('bass.saw', 'bass', 0.9), 'bass.finger')
+  // Toward modern the bass (and the beat) first, the beds next, the lead last.
+  assert.equal(eraVoice('bass.saw', 'bass', 0.6), 'bass.deep')
+  assert.equal(eraKit('kit.brush', 'drums', 0.6), 'kit.edm')
+  assert.equal(eraVoice('pad.saw', 'pad', 0.6), 'pad.saw')
+  assert.equal(eraVoice('pad.saw', 'pad', 0.7), 'pad.super')
+  assert.equal(eraVoice('arp.pluck', 'arp', 0.7), 'arp.pluck')
+  assert.equal(eraVoice('arp.pluck', 'arp', 0.8), 'pluck.super')
+  assert.equal(eraVoice('lead.square', 'lead', 0.9), 'lead.square')
+  assert.equal(eraVoice('lead.square', 'lead', 1), 'lead.super')
   // A counter line stays apart from the chip lead; an arp becomes the chip arp.
   assert.equal(eraVoice('mallet.kalimba', 'counter', 0), 'lead.pulse')
   assert.equal(eraVoice('mallet.marimba', 'arp', 0), 'arp.square')
+  // Modern: synth leads take the supersaw, airy ones sing, keys pluck; a counter never takes the anthem lead.
+  assert.equal(eraVoice('lead.hollow', 'lead', 1), 'vox.chop')
+  assert.equal(eraVoice('lead.ep', 'lead', 1), 'pluck.super')
+  assert.equal(eraVoice('lead.square', 'counter', 1), 'vox.chop')
+  assert.equal(eraVoice('counter.strings', 'counter', 1), 'pad.super')
+  assert.equal(eraVoice('mallet.marimba', 'arp', 1), 'pluck.super')
+  assert.equal(eraVoice('bass.808', 'bass', 1), 'bass.808')
 })
 
-test('at either end of Era every layer plays its chip or acoustic counterpart from the next phrase', () => {
+test('at either end of Era every layer plays its chip or modern counterpart from the next phrase', () => {
   const ends: Array<[number, (v: VoiceId) => boolean, (k: KitId) => boolean]> = [
     [0, v => CHIP_VOICES.has(v), k => k === 'kit.chip'],
-    [1, v => ACOUSTIC_VOICES.has(v), k => ['kit.acoustic', 'kit.brush', 'kit.tribal'].includes(k)],
+    [1, v => MODERN_VOICES.has(v), k => k === 'kit.edm'],
   ]
   for (const [era, voiceOk, kitOk] of ends) for (const L of BUILTIN) {
     const plans = run(3, 40, i => (i === 3 ? { era } : null), { landscape: L.id, intensity: 4 })
@@ -530,6 +590,59 @@ test('Era changes voices only at a phrase start; its fx move at once', () => {
   assert.equal(base[11]!.fx.crush, 0)
   assert.ok(turned[16]!.notes.every(n => CHIP_VOICES.has(n.voice)))
   assert.deepEqual(turned[16]!.notes.map(n => [n.layer, n.midi, n.step]), base[16]!.notes.map(n => [n.layer, n.midi, n.step]), 'the same music')
+  // Toward modern the fx move at once too: no tape, the top open, the low end and the sidechain in.
+  const up = run(5, 24, i => (i === 11 ? { era: 1 } : null), { landscape: 'coast', intensity: 4 })
+  for (let i = 11; i < 16; i++) assert.deepEqual(up[i]!.notes, base[i]!.notes, `bar ${i}`)
+  assert.equal(up[11]!.fx.grit, 0)
+  assert.equal(up[11]!.fx.low, 1)
+  assert.equal(up[11]!.fx.sidechain, 1)
+  assert.ok(up[11]!.fx.tone >= 0.95)
+  assert.equal(base[11]!.fx.sidechain, 0)
+  assert.equal(base[11]!.fx.low, 0)
+})
+
+test('toward modern the drums go four on the floor, or half time when slow, and the bass drops into the sub', () => {
+  const drumBars = (ps: BarPlan[]) => ps.filter(p => p.meta.active.includes('drums') && !p.drums.some(d => d.hit === 'z'))
+  const kicks = (p: BarPlan) => p.drums.filter(d => d.layer === 'drums' && d.hit === 'k').map(d => d.step).join(' ')
+  // Coast at 108 bpm, one step past the middle: the beat and the bass have handed over, the rest has not.
+  const four = run(3, 64, () => null, { landscape: 'coast', intensity: 4, era: 0.6 })
+  const fb = drumBars(four).filter(p => p.index > 16)
+  assert.ok(fb.length > 20)
+  const on = fb.filter(p => kicks(p) === '0 4 8 12')
+  assert.ok(on.length >= fb.length - 4, `four on the floor: ${fb.map(kicks).join(' | ')}`)
+  for (const p of fb) {
+    for (const d of p.drums.filter(d => d.layer === 'drums')) assert.equal(d.kit, 'kit.edm')
+    const bass = p.notes.filter(n => n.layer === 'bass')
+    assert.ok(bass.length > 0, `bar ${p.index} has no bass`)
+    for (const n of bass) {
+      assert.equal(n.voice, 'bass.deep')
+      assert.ok(n.midi >= 28 && n.midi <= 51, `bass ${n.midi} in the sub`)
+      assert.notEqual(n.step % 4, 0, `bar ${p.index}: bass on the kick at ${n.step}`)
+    }
+    assert.ok(p.notes.some(n => n.layer === 'pad' && n.voice === LANDSCAPES.coast!.pad.voice), 'the pad has not handed over yet')
+  }
+  // A build: a riser over the bar, the roll, and the last beat bare (no kick, no bass) for the drop.
+  const build = four.find(p => p.drums.some(d => d.hit === 'z' && d.step === 0 && d.len === 16))
+  assert.ok(build, 'a build')
+  assert.ok(!build!.drums.some(d => d.hit === 'k' && d.step >= 12))
+  assert.ok(!build!.notes.some(n => n.layer === 'bass' && n.step + n.len > 12))
+  assert.ok(build!.drums.filter(d => d.hit === 's' && d.step >= 8).length >= 8, 'a sixteenth roll')
+  const drop = four[build!.index + 1]!
+  if (drop.meta.section !== build!.meta.section) assert.ok(drop.drums.some(d => d.hit === 'x' && d.step === 0), 'the drop crashes')
+  // Frostwood at 72 bpm: half time, 808s.
+  const half = run(3, 64, () => null, { landscape: 'frostwood', intensity: 4, era: 1 })
+  const hb = drumBars(half).filter(p => p.index > 16)
+  assert.ok(hb.length > 8)
+  for (const p of hb) {
+    const snares = p.drums.filter(d => d.layer === 'drums' && (d.hit === 's' || d.hit === 'c')).map(d => d.step)
+    if (!snares.includes(0)) assert.deepEqual([...new Set(snares)].sort((a, b) => a - b), [4, 12], `bar ${p.index}`)
+    for (const n of p.notes.filter(n => n.layer === 'bass')) assert.equal(n.voice, 'bass.808')
+  }
+  assert.equal(subNote(4), 28)
+  assert.equal(subNote(3), 39)
+  // Swing straightens with the modern beat.
+  const village = run(1, 2, () => null, { landscape: 'village', era: 1 })
+  assert.ok(village[0]!.swing < LANDSCAPES.village!.swing)
 })
 
 test('Era leaves the music alone: back in the middle, the plan is the one it would have been', () => {

@@ -51,6 +51,8 @@ export interface Stats {
   clip: number
   centroid: number
   hf: number
+  /** Share of the energy below 100 Hz, in % (the sub). */
+  lo: number
 }
 
 export interface Row {
@@ -184,17 +186,18 @@ function measure(buf: AudioBuffer, t0: number, t1: number): Stats {
     fft(re, im)
     for (let i = 0; i < N / 2; i++) spec[i] = spec[i]! + re[i]! * re[i]! + im[i]! * im[i]!
   }
-  let tot = 0, cen = 0, hi = 0
+  let tot = 0, cen = 0, hi = 0, lo = 0
   for (let i = 1; i < N / 2; i++) {
     const f = (i * SR) / N
     tot += spec[i]!
     cen += f * spec[i]!
     if (f > 5000) hi += spec[i]!
+    if (f < 100) lo += spec[i]!
   }
   return {
     peak: db(peak), rms: db(Math.sqrt(sum / (2 * n))), lufs: lufsOf(ksum / n), mom: lufsOf(mom), pre: db(pre),
     dc: Math.max(Math.abs(dcL / n), Math.abs(dcR / n)), nan, clip,
-    centroid: tot > 0 ? cen / tot : 0, hf: tot > 0 ? (100 * hi) / tot : 0,
+    centroid: tot > 0 ? cen / tot : 0, hf: tot > 0 ? (100 * hi) / tot : 0, lo: tot > 0 ? (100 * lo) / tot : 0,
   }
 }
 
@@ -586,15 +589,16 @@ window.runAudioCheck = async (filter: string, wavAll: boolean) => {
 }
 
 /**
- * Era: a few landscapes at the 8-bit end, the middle and the analog end (the
- * same seed as the landscape group), and one sweep across the knob so the
- * crush and tape glide under the music.
+ * Era: a few landscapes at the 8-bit end, the middle and the modern end (the
+ * same seed as the landscape group; coast and nightdrive go four on the floor
+ * there, the slower ones half time), and one sweep across the knob so the
+ * crush, the tape and the sidechain glide under the music.
  */
 function eraCases(wavAll: boolean): Case[] {
   const out: Case[] = []
   const at = (id: string, era: number, seed = 7) => createConductor({ lookup: x => LANDSCAPES[x], seed, controls: { landscape: id, intensity: 4, era } })
-  for (const id of ['coast', 'village', 'deepspace', 'caverns']) {
-    for (const [name, era] of [['8bit', 0], ['mid', 0.5], ['analog', 1]] as const) {
+  for (const id of ['coast', 'nightdrive', 'village', 'deepspace', 'caverns']) {
+    for (const [name, era] of [['8bit', 0], ['mid', 0.5], ['modern', 1]] as const) {
       out.push({ group: 'era', name: `${id}:${name}`, seconds: 50, from: 22, wav: wavAll, visual: true, conductor: () => at(id, era) })
     }
   }
@@ -603,6 +607,13 @@ function eraCases(wavAll: boolean): Case[] {
     out.push({
       group: 'era', name: `crush:${crush}`, seconds: 24, from: 2, wav: wavAll,
       conductor: () => { const c = fullMix(); return { ...c, nextBar: (): BarPlan => { const p = c.nextBar(); return { ...p, fx: { ...p.fx, crush } } } } },
+    })
+  }
+  // The sidechain and low end alone (the modern side): the full mix without its pump, with both off and full.
+  for (const sc of [0, 1]) {
+    out.push({
+      group: 'era', name: `sidechain:${sc}`, seconds: 24, from: 2, wav: wavAll,
+      conductor: () => { const c = fullMix(); return { ...c, nextBar: (): BarPlan => { const p = c.nextBar(); return { ...p, fx: { ...p.fx, pump: 0, sidechain: sc, low: sc } } } } },
     })
   }
   out.push({

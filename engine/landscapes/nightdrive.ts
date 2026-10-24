@@ -1,6 +1,6 @@
 import type { Landscape } from '../types.ts'
 
-/** The car trip: A minor synthwave, pumping pads, a gliding lead. */
+/** The car trip: A minor synthwave, pumping pads, a gliding lead, a tambourine on the backbeat. */
 export const nightdrive: Landscape = {
   id: 'nightdrive',
   name: 'Night Drive',
@@ -13,6 +13,7 @@ export const nightdrive: Landscape = {
   progressions: [
     { chords: '1 6 3 7', role: 'a', weight: 2 },
     { chords: '6 7 1:2', role: 'a' },
+    { chords: '1 4 6 5', role: 'a' },
     { chords: '4 6 7:2', role: 'b' },
     { chords: '6 3 7 1', role: 'b' },
     { chords: '6 7 5M:2', role: 'bridge' },
@@ -31,6 +32,7 @@ export const nightdrive: Landscape = {
       '5 - - - 3 - 4 - | 5 - 6 - 5 - 3 -',
       "1' - - 7 - 5 - - | 6 - - - - - . .",
       "3 - 4 5 - - 7 - | 1' - - - 7 - 5 -",
+      "1' - 7 - 6 - 5 - | 6 - - - 3 - - -",
     ],
   },
   counter: { voice: 'counter.strings', style: 'guide' },
@@ -44,15 +46,22 @@ export const nightdrive: Landscape = {
       { k: 'x...x...x...x...', s: '....X.......X...', c: '....x.......x...', h: 'xgxgxgxgxgxgxgxg', o: '..x...x...x...x.' },
     ],
     fill: { k: 'x...x...x.......', s: '....X...x.x.xxxx', z: '........x-------' },
+    // The 80s tambourine: on the backbeat, then shaking the offbeats too.
+    percKit: 'kit.motorik',
+    perc: [{}, {}, {}, { p: '....x.......x...' }, { p: '..g.x.g...g.x.g.' }],
   },
   layers: [
     ['ambience', 'pad'],
     ['ambience', 'pad', 'bass', 'arp'],
     ['ambience', 'pad', 'bass', 'arp', 'drums'],
-    ['ambience', 'pad', 'bass', 'arp', 'drums', 'lead'],
-    ['ambience', 'pad', 'bass', 'arp', 'drums', 'lead', 'counter'],
+    ['ambience', 'pad', 'bass', 'arp', 'perc', 'drums', 'lead'],
+    ['ambience', 'pad', 'bass', 'arp', 'perc', 'drums', 'lead', 'counter'],
   ],
   fx: { reverb: 0.35, delay: 0.35, reverbSize: 2.8, tone: 0.8, grit: 0.3, pump: 0.55 },
   ambience: { road: 0.45, passing: 0.3 },
   accent: '#ff8a3d',
+  alt: {
+    lead: ['lead.saw', 'lead.fm', 'guitar.steel'], arp: ['arp.seq', 'guitar.mute'],
+    bass: ['bass.saw', 'bass.fm'], pad: ['pad.saw', 'pad.dark'],
+  },
 }

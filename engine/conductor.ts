@@ -11,10 +11,13 @@
  *   the painted scene glide across. The new place arrives with pad and
  *   drone and builds back up to the chosen intensity.
  * - Mood changes the mode at the next phrase; density and Era's voices
- *   too. Tempo glides across a phrase.
+ *   too (and toward modern its grooves: four on the floor or half time, a
+ *   deep sub, builds and drops). Tempo glides across a phrase.
  * - Left alone, the music has form: sections A, A2, B, A over the
  *   landscape's progressions, and now and then a phrase where the drums and
- *   lead step out to breathe.
+ *   lead step out to breathe. The varied and contrast sections bring their
+ *   own colour at drive and surge: a rhythm for the pad, a twin lead in
+ *   thirds, a lean for the arp, a fill of their own.
  * - A landscape with written phrases (made in jam) quotes one now and then:
  *   a section W that plays the phrase over its own chords for eight bars,
  *   its parts in place of the composer on their layers, then the cycle goes
@@ -30,9 +33,11 @@ import type { Rng } from './rng.ts'
 import { keyName, parseProgression, parseToken, scalePcs, MODE_STEPS } from './theory.ts'
 import type { ParsedToken } from './theory.ts'
 import { composeBar, makeMotif, newMemory, varyMotif } from './composer.ts'
-import type { Motif, PhraseShape } from './composer.ts'
+import type { ArpAccent, FillKind, Motif, PadStyle, PhraseShape } from './composer.ts'
 import { orchestrate } from './orchestra.ts'
-import { eraBar } from './palette.ts'
+import { eraBar, handedOver, modernAmount } from './palette.ts'
+import { modernBar, modernStyle } from './modern.ts'
+import type { ModernStyle } from './modern.ts'
 import type { Orchestration } from './orchestra.ts'
 import { DEFAULT_QUOTE, preparedWritten, WRITTEN_BARS, writtenBar, writtenSpans } from './written.ts'
 import type { PreparedPhrase } from './written.ts'
@@ -67,6 +72,11 @@ interface Section {
   orch: Orchestration
   /** B: the arp plays another pattern. */
   arpPattern?: ArpPattern
+  /** A2 and B now and then: the pad's rhythm, a twin lead, the arp's accents (composer.ts); any section: its fill. */
+  padStyle?: PadStyle
+  harmony?: boolean
+  arpAccent?: ArpAccent
+  fillKind?: FillKind
   /** An A that follows the contrast: the theme comes home. */
   returning: boolean
   /** W: the written phrase it quotes, and the section that was due when it came in (it follows). */
@@ -131,24 +141,29 @@ export const ERA_CRUSH = 0.75
 
 /**
  * A landscape's effects shaped by the Space, Era and Mood knobs. The pump
- * only works while drums sound. Era's middle keeps the landscape's tape;
- * toward 8-bit the tape goes and bit crush comes in (gently over the first
- * stretch, and never all the way to the coarse staircase), toward analog the
- * tape deepens a little.
+ * and the sidechain only work while drums sound. Era's middle keeps the
+ * landscape's tape; toward 8-bit the tape goes and bit crush comes in
+ * (gently over the first stretch, and never all the way to the coarse
+ * staircase); toward modern the tape is gone by halfway, the top opens, the
+ * low end deepens and the kick ducks the whole band (strongly from the first
+ * step: the square root).
  */
 export function shapeFx(f: FxSpec, controls: Pick<Controls, 'space' | 'era' | 'mood'>, drums: boolean): FxState {
   const space = controls.space
   const chip = Math.max(0, Math.min(1, (0.5 - controls.era) * 2))
-  const analog = Math.max(0, Math.min(1, (controls.era - 0.5) * 2))
+  const modern = modernAmount(controls.era)
+  const tone = Math.max(0.05, Math.min(1, f.tone * (1.08 - 0.16 * controls.mood)))
   return {
     reverb: Math.min(1, f.reverb * (0.35 + 1.3 * space)),
     delay: Math.min(1, f.delay * (0.35 + 1.3 * space)),
     reverbSize: f.reverbSize * (0.65 + 0.7 * space),
-    tone: Math.max(0.05, Math.min(1, f.tone * (1.08 - 0.16 * controls.mood))),
-    grit: Math.min(1, (f.grit * 0.4 + 0.225) * (1 - chip) + 0.35 * analog),
+    tone: tone + (Math.max(tone, 0.95) - tone) * modern,
+    grit: (f.grit * 0.4 + 0.225) * (1 - chip) * Math.max(0, 1 - 2 * modern),
     crush: ERA_CRUSH * chip * chip,
     pump: (f.pump ?? 0) * (drums ? 1 : 0),
     width: 0.55 + 0.45 * space,
+    sidechain: drums ? Math.sqrt(modern) : 0,
+    low: modern,
   }
 }
 
@@ -204,6 +219,8 @@ export function createConductor(opts: ConductorOptions): Conductor {
   let density = controls.density
   /** Era as the voices hear it: latched at phrase starts, so no one changes instrument mid-phrase. */
   let era = controls.era
+  /** The modern end's groove for the tempo: latched with Era, so a tempo glide never switches it mid-phrase. */
+  let style: ModernStyle = modernStyle(L.bpm + controls.tempo)
   let present = new Set<Layer>(['ambience'])
   let schedule: Scheduled[] = []
   let move: LandscapeMove | null = null
@@ -270,7 +287,30 @@ export function createConductor(opts: ConductorOptions): Conductor {
     if (name === 'B' && own && own !== 'sequence' && own !== 'random' && orng.chance(0.5)) {
       arpPattern = orng.pick((['up', 'down', 'updown', 'broken', 'pedal'] as ArpPattern[]).filter(p => p !== own))
     }
-    return { name, startBar, prog, seed: sseed, motif, motifB, phrases, phrasesDone: 0, orch, arpPattern, returning }
+    const look = colour(name, sseed, returning, orch)
+    // A twin lead takes the place of the octave double.
+    if (look.harmony) orch.double = undefined
+    return { name, startBar, prog, seed: sseed, motif, motifB, phrases, phrasesDone: 0, orch, arpPattern, returning, ...look }
+  }
+
+  /**
+   * A section's colour, from a stream of its own (so the rest of the section
+   * is what it was): the home section keeps the landscape's sound, but its
+   * return may sing in thirds instead of octaves; A2 and B may give the pad a
+   * rhythm (not in the slow ambient places), a twin lead in thirds, an accent
+   * pattern for the arp; any section may have its own fill.
+   */
+  function colour(name: Section['name'], sseed: number, returning: boolean, orch: Orchestration): Pick<Section, 'padStyle' | 'harmony' | 'arpAccent' | 'fillKind'> {
+    const r = createRng(hashSeed(sseed, 0x7a51))
+    const odds = { A: [0, returning ? 0.4 : 0, 0], A2: [0.25, 0.2, 0.3], B: [0.55, 0.35, 0.4], W: [0, 0, 0] }[name]
+    const swung = L.swing >= 0.1
+    const padStyle = r.chance(odds[0]!) && L.bpm >= 76
+      ? r.weighted<PadStyle>(['pulse', 'push', 'stab'], swung ? [1, 2, 2] : [2, 2, 1])
+      : undefined
+    const harmony = r.chance(odds[1]!) && (returning || !orch.double)
+    const arpAccent = r.chance(odds[2]!) ? r.pick<ArpAccent>(['332', 'off']) : undefined
+    const fillKind = r.weighted<FillKind>(['own', 'toms', 'roll'], [3, 1, 1])
+    return { padStyle, harmony, arpAccent, fillKind }
   }
 
   /** Lead register per phrase of a section (semitones from the centre of its range): low, then higher. */
@@ -569,6 +609,7 @@ export function createConductor(opts: ConductorOptions): Conductor {
       reverb: lerp(a.reverb, b.reverb, t), delay: lerp(a.delay, b.delay, t),
       reverbSize: lerp(a.reverbSize, b.reverbSize, t), tone: lerp(a.tone, b.tone, t),
       grit: lerp(a.grit, b.grit, t), crush: lerp(a.crush, b.crush, t), pump: lerp(a.pump, b.pump, t), width: lerp(a.width, b.width, t),
+      sidechain: lerp(a.sidechain ?? 0, b.sidechain ?? 0, t), low: lerp(a.low ?? 0, b.low ?? 0, t),
     }
   }
 
@@ -595,7 +636,10 @@ export function createConductor(opts: ConductorOptions): Conductor {
     // New phrase?
     const phraseStartsHere = b === phraseStart + phraseBars || (b === phraseStart && b === 0)
     if (b === phraseStart + phraseBars) phraseStart = b
-    if (phraseStartsHere || arriving) era = controls.era
+    if (phraseStartsHere || arriving) {
+      era = controls.era
+      style = modernStyle(L.bpm + controls.tempo)
+    }
     let sectionStart = b === 0
     if (b === 0) { freshTheme(true); section = newSection('A', 0) }
     if (phraseStartsHere && b > 0 && !(move && b >= move.bridgeStart)) {
@@ -677,7 +721,10 @@ export function createConductor(opts: ConductorOptions): Conductor {
     const lastOfPhrase = phraseBar === phraseBars - 1
     const sectionEnds = lastOfPhrase && section.phrasesDone >= section.phrases - 1
     const fill = present.has('drums') && !inBridge && (drumsOffNext || (lastOfPhrase && (sectionEnds || rng.chance(0.3))))
-    const crash = present.has('drums') && (entered.has('drums') || (sectionStart && !entered.size && b > 0))
+    // At the modern end every new section is a drop after its build, so it crashes even as a layer enters.
+    const drop = era > 0.5 && handedOver('drums', era)
+    const crash = present.has('drums') && (entered.has('drums') || (sectionStart && b > 0 && (!entered.size || drop)))
+    const pickup = drumsOnNext && !inBridge
 
     // Patterns climb one level at a time, with an entry or on a half-phrase,
     // and come down only where the phrase turns, with the layers that leave.
@@ -711,7 +758,7 @@ export function createConductor(opts: ConductorOptions): Conductor {
       motifB: section.motifB,
       leadOn: leadOn && !inBridge,
       fill,
-      pickup: drumsOnNext && !inBridge,
+      pickup,
       crash,
       present,
       mem,
@@ -721,6 +768,10 @@ export function createConductor(opts: ConductorOptions): Conductor {
       lift: phrase?.lift,
       arpPattern: inBridge ? undefined : section.arpPattern,
       walk,
+      padStyle: inBridge ? undefined : section.padStyle,
+      harmony: !inBridge && !!section.harmony,
+      arpAccent: inBridge ? undefined : section.arpAccent,
+      fillKind: inBridge ? undefined : section.fillKind,
     })
     let notes = composed.notes
     let drumHits = composed.drums
@@ -728,6 +779,17 @@ export function createConductor(opts: ConductorOptions): Conductor {
     if (sectionEnds && section.name === 'B' && present.has('drums') && controls.intensity >= 2 && !drumHits.some(d => d.hit === 'z')) {
       drumHits.push({ layer: 'drums', kit: land.drums.kit, hit: 'z', step: 8, vel: 0.7, len: 8 })
     }
+    // Drums coming in at drive or surge (a build, the end of a breath) rise into it under their pickup; the crash is the drop.
+    if (pickup && controls.intensity >= 3 && !drumHits.some(d => d.hit === 'z')) {
+      drumHits.push({ layer: 'drums', kit: land.drums.kit, hit: 'z', step: 8, vel: 0.6, len: 8 })
+    }
+    // Era's modern end remakes the rhythm section: four on the floor or half time, a deep sub, builds and drops.
+    ;({ notes, drums: drumHits } = modernBar(notes, drumHits, {
+      era, style, level, spans, present, pickup,
+      drumsFrom: Math.max(0, land.layers.findIndex(ls => ls.includes('drums'))),
+      phraseBar: inBridge ? bridgeBar : phraseBar,
+      fill: fill ? (drumsOffNext ? 'close' : sectionEnds ? 'build' : 'lift') : null,
+    }))
 
     // A quote: the written parts that sound replace the composer on their layers.
     const quoting = !inBridge && section.written ? section.written : null
@@ -737,13 +799,14 @@ export function createConductor(opts: ConductorOptions): Conductor {
       drumHits = [...drumHits.filter(d => !quoting.layers.has(d.layer)), ...w.drums]
     }
 
-    // Era: layers that have handed over play their chip or acoustic counterpart.
+    // Era: layers that have handed over play their chip or modern counterpart.
     ;({ notes, drums: drumHits } = eraBar(notes, drumHits, era))
 
-    // Mix: entering layers swell or start on the beat; leaving ones die away.
+    // Mix: entering layers swell or start on the beat; leaving ones die away. The drums' bus opens a bar
+    // early for their pickup.
     const mix: BarPlan['mix'] = {}
     for (const l of LAYERS) {
-      const on = present.has(l)
+      const on = present.has(l) || (l === 'drums' && pickup)
       const m: LayerMix = { gain: on ? 1 : 0, fadeBars: 0 }
       if (entered.has(l)) m.fadeBars = SOFT.has(l) ? 1 : 0
       else if (left.has(l)) m.fadeBars = SOFT.has(l) ? 2 : 1
@@ -806,7 +869,8 @@ export function createConductor(opts: ConductorOptions): Conductor {
       index: b,
       bpmStart,
       bpmEnd,
-      swing: land.swing,
+      // Modern grooves sit nearly straight.
+      swing: era > 0.5 && handedOver('drums', era) ? land.swing * 0.35 : land.swing,
       chords: spans,
       key: barKey,
       scale,
