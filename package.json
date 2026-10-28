@@ -23,7 +23,7 @@
   },
   "license": "ISC",
   "dependencies": {
-    "nuxt": "^3.21.0"
+    "nuxt": "^4.6.2"
   },
   "devDependencies": {
     "@types/node": "^22.20.4",
