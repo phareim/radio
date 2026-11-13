@@ -10,7 +10,7 @@ works, with editable code cells running it in the page (Norwegian):
 
 ## The web app
 
-Nuxt 3 on a Cloudflare Worker (`radio-web`, custom domain `radio.phareim.no`),
+Nuxt 4 on a Cloudflare Worker (`radio-web`, custom domain `radio.phareim.no`),
 open to anyone with the link, no login needed: listening, thumbs,
 composing and settings. A listener without a Reader session is a guest,
 named by a random id in the `radio_guest` cookie (so their channels and

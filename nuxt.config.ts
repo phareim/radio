@@ -1,4 +1,4 @@
-// radio.phareim.no: Nuxt 3 on a Cloudflare Worker behind Reader login,
+// radio.phareim.no: Nuxt 4 on a Cloudflare Worker behind Reader login,
 // proxying feedback and Opus composing to radio-api on Sleeper.
 export default defineNuxtConfig({
   compatibilityDate: '2024-09-23',
