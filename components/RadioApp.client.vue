@@ -335,8 +335,10 @@ onMounted(() => {
   calm.value = load<boolean>(CALM_KEY, false) === true
   if (calm.value) wake()
   played.start()
-  void refresh()
-  void fetchSession().then((ok) => {
+  const session = fetchSession()
+  // The cache shows at once; the backend is asked after the session answer has set the guest cookie.
+  void refresh(session)
+  void session.then((ok) => {
     // After the session answer, so the minutes go to the listener it named.
     void played.sync()
     if (!ok) return

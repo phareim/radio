@@ -54,21 +54,32 @@ function createClock(onTick: () => void): Clock {
   let ms = 0
   let id: ReturnType<typeof setInterval> | null = null
   let worker: Worker | null = null
+  let url = ''
+  // WebKit loads the worker's script after the constructor returns, so the URL
+  // is revoked once the worker has ticked (or failed), not straight away.
+  const revoke = () => {
+    if (url) URL.revokeObjectURL(url)
+    url = ''
+  }
   const interval = () => {
     if (id) clearInterval(id)
     id = ms > 0 ? setInterval(onTick, ms) : null
   }
   try {
-    const url = URL.createObjectURL(new Blob([WORKER_SRC], { type: 'text/javascript' }))
+    url = URL.createObjectURL(new Blob([WORKER_SRC], { type: 'text/javascript' }))
     worker = new Worker(url)
-    URL.revokeObjectURL(url)
-    worker.onmessage = () => onTick()
+    worker.onmessage = () => {
+      revoke()
+      onTick()
+    }
     worker.onerror = () => {
+      revoke()
       worker?.terminate()
       worker = null
       interval()
     }
   } catch {
+    revoke()
     worker = null
   }
   return {
@@ -78,6 +89,7 @@ function createClock(onTick: () => void): Clock {
       else interval()
     },
     dispose() {
+      revoke()
       worker?.terminate()
       if (id) clearInterval(id)
     },

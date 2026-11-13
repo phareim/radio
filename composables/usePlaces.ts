@@ -42,9 +42,11 @@ function validList(list: unknown[]): Landscape[] {
   return out
 }
 
-async function refresh(): Promise<void> {
+/** `after`: the session answer. A first visit has no guest cookie yet, and every cookieless call would name a new guest. */
+async function refresh(after?: Promise<unknown>): Promise<void> {
   const { setComposed } = useRadio()
   setComposed(validList(load<unknown[]>(CACHE_KEY, [])))
+  await after
   try {
     const r = await $fetch<{ landscapes: unknown[] }>('/api/landscapes')
     const list = validList(r.landscapes ?? [])
